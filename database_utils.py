@@ -171,16 +171,19 @@ class DataProcessor:
                 c_max = df[col].max()
                 
                 if str(col_type)[:3] == 'int':
-                    if c_min > pd.iinfo(pd.Int8Dtype()).min and c_max < pd.iinfo(pd.Int8Dtype()).max:
-                        df[col] = df[col].astype(pd.Int8Dtype())
-                    elif c_min > pd.iinfo(pd.Int16Dtype()).min and c_max < pd.iinfo(pd.Int16Dtype()).max:
-                        df[col] = df[col].astype(pd.Int16Dtype())
-                    elif c_min > pd.iinfo(pd.Int32Dtype()).min and c_max < pd.iinfo(pd.Int32Dtype()).max:
-                        df[col] = df[col].astype(pd.Int32Dtype())
+                    if c_min > -128 and c_max < 127:
+                        df[col] = df[col].astype('int8')
+                    elif c_min > -32768 and c_max < 32767:
+                        df[col] = df[col].astype('int16')
+                    elif c_min > -2147483648 and c_max < 2147483647:
+                        df[col] = df[col].astype('int32')
                         
                 elif str(col_type)[:5] == 'float':
-                    if c_min > pd.finfo(pd.Float32Dtype()).min and c_max < pd.finfo(pd.Float32Dtype()).max:
-                        df[col] = df[col].astype(pd.Float32Dtype())
+                    # Try to convert to float32 if values fit
+                    try:
+                        df[col] = pd.to_numeric(df[col], downcast='float')
+                    except:
+                        pass
                         
             else:
                 # Convert object columns to category if beneficial
