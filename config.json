@@ -1,0 +1,25 @@
+{
+  "app_settings": {
+    "theme": "arc",
+    "max_display_rows": 10000,
+    "chunk_size": 1000,
+    "auto_optimize_datatypes": true,
+    "show_progress_bar": true,
+    "default_export_format": "csv"
+  },
+  "ui_settings": {
+    "window_width": 1400,
+    "window_height": 900,
+    "font_family": "Segoe UI",
+    "font_size": 9,
+    "tree_row_height": 25
+  },
+  "performance_settings": {
+    "use_threading": true,
+    "cache_enabled": true,
+    "lazy_loading": true,
+    "memory_threshold_mb": 500
+  },
+  "recent_files": [],
+  "database_connections": {}
+}

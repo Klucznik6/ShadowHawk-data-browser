@@ -1,0 +1,16 @@
+name,age,city,salary,department,hire_date,active
+John Smith,28,New York,75000,Engineering,2022-03-15,True
+Jane Doe,32,Los Angeles,82000,Marketing,2021-07-20,True
+Bob Johnson,45,Chicago,95000,Finance,2019-11-08,True
+Alice Brown,29,Houston,68000,HR,2023-01-12,True
+Charlie Wilson,36,Phoenix,78000,Sales,2020-09-25,False
+Diana Garcia,31,Philadelphia,71000,Engineering,2022-05-30,True
+Eve Martinez,27,San Antonio,65000,Marketing,2023-02-14,True
+Frank Davis,42,San Diego,89000,Finance,2018-12-03,True
+Grace Miller,33,Dallas,76000,HR,2021-10-18,True
+Henry Rodriguez,38,San Jose,91000,Sales,2020-04-07,True
+Sarah Taylor,26,Austin,63000,Engineering,2023-06-01,True
+Michael Anderson,35,Jacksonville,84000,Marketing,2019-08-15,True
+Lisa Thomas,30,San Francisco,87000,Finance,2021-01-28,True
+David Jackson,41,Columbus,92000,HR,2018-03-22,True
+Jennifer White,34,Fort Worth,79000,Sales,2020-11-11,True

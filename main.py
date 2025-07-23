@@ -1,0 +1,1017 @@
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+import os
+import threading
+import pandas as pd
+from datetime import datetime
+from typing import Dict, List, Any, Optional
+import json
+
+# Import our custom modules
+from database_utils import DatabaseManager, DataProcessor
+
+try:
+    from ttkthemes import ThemedTk
+    THEMED_TK_AVAILABLE = True
+except ImportError:
+    THEMED_TK_AVAILABLE = False
+
+class ShadowHawkBrowser:
+    """Enhanced database browser with modern GUI and fast performance"""
+    
+    def __init__(self):
+        # Initialize main window
+        if THEMED_TK_AVAILABLE:
+            self.root = ThemedTk(theme="arc")
+        else:
+            self.root = tk.Tk()
+            
+        self.root.title("ShadowHawk Database Browser v2.0")
+        self.root.geometry("1400x900")
+        self.root.minsize(1000, 700)
+        
+        # Set application icon if available
+        try:
+            self.root.iconbitmap("icon.ico")
+        except:
+            pass
+            
+        # Initialize managers
+        self.db_manager = DatabaseManager()
+        self.data_processor = DataProcessor()
+        
+        # Application state
+        self.databases: Dict[str, Any] = {}
+        self.current_db = None
+        self.current_table = None
+        self.current_data = None
+        self.filtered_data = None
+        
+        # Performance settings
+        self.max_display_rows = 10000
+        self.chunk_size = 1000
+        
+        # Setup UI
+        self.setup_styles()
+        self.setup_ui()
+        self.setup_bindings()
+        
+        # Load settings
+        self.load_settings()
+        
+    def setup_styles(self):
+        """Setup custom styles for better appearance"""
+        style = ttk.Style()
+        
+        # Configure treeview for better readability
+        style.configure("Treeview", rowheight=25)
+        style.configure("Treeview.Heading", font=('Segoe UI', 9, 'bold'))
+        
+    def setup_ui(self):
+        """Setup the main UI components"""
+        self.create_menu()
+        self.create_toolbar()
+        self.create_main_layout()
+        self.create_status_bar()
+        
+    def create_menu(self):
+        """Create enhanced menu bar"""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+        
+        # File menu
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Open Database...", command=self.open_database, accelerator="Ctrl+O")
+        file_menu.add_separator()
+        
+        import_menu = tk.Menu(file_menu, tearoff=0)
+        file_menu.add_cascade(label="Import", menu=import_menu)
+        import_menu.add_command(label="CSV File...", command=self.import_csv)
+        import_menu.add_command(label="Excel File...", command=self.import_excel)
+        import_menu.add_command(label="JSON File...", command=self.import_json)
+        
+        export_menu = tk.Menu(file_menu, tearoff=0)
+        file_menu.add_cascade(label="Export", menu=export_menu)
+        export_menu.add_command(label="Current Table...", command=self.export_table)
+        export_menu.add_command(label="Filtered Data...", command=self.export_filtered)
+        
+        file_menu.add_separator()
+        file_menu.add_command(label="Recent Files", state="disabled")
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.root.quit)
+        
+        # Edit menu
+        edit_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Edit", menu=edit_menu)
+        edit_menu.add_command(label="Find...", command=self.focus_search, accelerator="Ctrl+F")
+        edit_menu.add_command(label="Clear Search", command=self.clear_search)
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Copy Selected", command=self.copy_selected, accelerator="Ctrl+C")
+        
+        # View menu
+        view_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="View", menu=view_menu)
+        view_menu.add_command(label="Refresh", command=self.refresh_current_table, accelerator="F5")
+        view_menu.add_command(label="Show Column Stats", command=self.show_column_stats)
+        view_menu.add_separator()
+        view_menu.add_command(label="Increase Font Size", command=self.increase_font)
+        view_menu.add_command(label="Decrease Font Size", command=self.decrease_font)
+        
+        # Tools menu
+        tools_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label="SQL Query...", command=self.open_sql_query)
+        tools_menu.add_command(label="Data Statistics", command=self.show_data_stats)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="Settings...", command=self.open_settings)
+        
+        # Help menu
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="Keyboard Shortcuts", command=self.show_shortcuts)
+        help_menu.add_command(label="About", command=self.show_about)
+        
+    def create_toolbar(self):
+        """Create enhanced toolbar"""
+        # Main toolbar frame
+        toolbar_frame = ttk.Frame(self.root)
+        toolbar_frame.pack(fill=tk.X, padx=5, pady=2)
+        
+        # File operations
+        file_frame = ttk.LabelFrame(toolbar_frame, text="File", padding=5)
+        file_frame.pack(side=tk.LEFT, padx=2)
+        
+        ttk.Button(file_frame, text="Open DB", command=self.open_database, width=8).pack(side=tk.LEFT, padx=1)
+        ttk.Button(file_frame, text="Import", command=self.show_import_menu, width=8).pack(side=tk.LEFT, padx=1)
+        
+        # Data operations
+        data_frame = ttk.LabelFrame(toolbar_frame, text="Data", padding=5)
+        data_frame.pack(side=tk.LEFT, padx=2)
+        
+        ttk.Button(data_frame, text="Refresh", command=self.refresh_current_table, width=8).pack(side=tk.LEFT, padx=1)
+        ttk.Button(data_frame, text="Export", command=self.export_table, width=8).pack(side=tk.LEFT, padx=1)
+        ttk.Button(data_frame, text="Stats", command=self.show_data_stats, width=8).pack(side=tk.LEFT, padx=1)
+        
+        # Search frame
+        search_frame = ttk.LabelFrame(toolbar_frame, text="Search", padding=5)
+        search_frame.pack(side=tk.RIGHT, padx=2)
+        
+        self.search_var = tk.StringVar()
+        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=25)
+        self.search_entry.pack(side=tk.LEFT, padx=2)
+        self.search_entry.bind('<Return>', self.search_data)
+        self.search_entry.bind('<KeyRelease>', self.on_search_change)
+        
+        ttk.Button(search_frame, text="Clear", command=self.clear_search, width=6).pack(side=tk.LEFT, padx=1)
+        
+    def create_main_layout(self):
+        """Create main application layout"""
+        # Main paned window
+        main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
+        main_paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Left panel
+        self.create_left_panel(main_paned)
+        
+        # Right panel
+        self.create_right_panel(main_paned)
+        
+        # Set initial pane sizes
+        self.root.after(100, lambda: main_paned.sashpos(0, 300))
+        
+    def create_left_panel(self, parent):
+        """Create left panel with database and table browser"""
+        left_frame = ttk.Frame(parent)
+        parent.add(left_frame, weight=1)
+        
+        # Database section
+        db_label_frame = ttk.LabelFrame(left_frame, text="Databases", padding=5)
+        db_label_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
+        
+        # Database listbox with scrollbar
+        db_frame = ttk.Frame(db_label_frame)
+        db_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.db_listbox = tk.Listbox(db_frame, height=6)
+        db_scrollbar = ttk.Scrollbar(db_frame, orient=tk.VERTICAL, command=self.db_listbox.yview)
+        self.db_listbox.configure(yscrollcommand=db_scrollbar.set)
+        
+        self.db_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        db_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.db_listbox.bind('<<ListboxSelect>>', self.on_database_select)
+        
+        # Table section
+        table_label_frame = ttk.LabelFrame(left_frame, text="Tables", padding=5)
+        table_label_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Table listbox with scrollbar
+        table_frame = ttk.Frame(table_label_frame)
+        table_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.table_listbox = tk.Listbox(table_frame)
+        table_scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.table_listbox.yview)
+        self.table_listbox.configure(yscrollcommand=table_scrollbar.set)
+        
+        self.table_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        table_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.table_listbox.bind('<<ListboxSelect>>', self.on_table_select)
+        self.table_listbox.bind('<Double-Button-1>', self.on_table_double_click)
+        
+    def create_right_panel(self, parent):
+        """Create right panel with data display"""
+        right_frame = ttk.Frame(parent)
+        parent.add(right_frame, weight=4)
+        
+        # Table info frame
+        info_frame = ttk.Frame(right_frame)
+        info_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        self.table_info_label = ttk.Label(info_frame, text="No table selected", font=('Segoe UI', 10, 'bold'))
+        self.table_info_label.pack(side=tk.LEFT)
+        
+        self.row_count_label = ttk.Label(info_frame, text="")
+        self.row_count_label.pack(side=tk.RIGHT)
+        
+        # Data display notebook for multiple views
+        self.data_notebook = ttk.Notebook(right_frame)
+        self.data_notebook.pack(fill=tk.BOTH, expand=True)
+        
+        # Data view tab
+        self.data_frame = ttk.Frame(self.data_notebook)
+        self.data_notebook.add(self.data_frame, text="Data View")
+        
+        self.create_data_display(self.data_frame)
+        
+        # Column info tab
+        self.column_frame = ttk.Frame(self.data_notebook)
+        self.data_notebook.add(self.column_frame, text="Column Info")
+        
+        self.create_column_info(self.column_frame)
+        
+    def create_data_display(self, parent):
+        """Create the main data display treeview"""
+        # Frame for treeview and scrollbars
+        tree_frame = ttk.Frame(parent)
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Treeview
+        self.data_tree = ttk.Treeview(tree_frame, style="Treeview")
+        
+        # Scrollbars
+        v_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.data_tree.yview)
+        h_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.data_tree.xview)
+        
+        self.data_tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        
+        # Grid layout
+        self.data_tree.grid(row=0, column=0, sticky=tk.NSEW)
+        v_scrollbar.grid(row=0, column=1, sticky=tk.NS)
+        h_scrollbar.grid(row=1, column=0, sticky=tk.EW)
+        
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
+        
+        # Context menu for treeview
+        self.create_context_menu()
+        
+    def create_column_info(self, parent):
+        """Create column information display"""
+        # Column info treeview
+        self.column_tree = ttk.Treeview(parent, columns=('Type', 'Null Count', 'Unique', 'Stats'), show='tree headings')
+        
+        self.column_tree.heading('#0', text='Column Name')
+        self.column_tree.heading('Type', text='Data Type')
+        self.column_tree.heading('Null Count', text='Null Count')
+        self.column_tree.heading('Unique', text='Unique Values')
+        self.column_tree.heading('Stats', text='Statistics')
+        
+        self.column_tree.column('#0', width=150)
+        self.column_tree.column('Type', width=100)
+        self.column_tree.column('Null Count', width=80)
+        self.column_tree.column('Unique', width=80)
+        self.column_tree.column('Stats', width=200)
+        
+        # Scrollbar for column info
+        col_scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=self.column_tree.yview)
+        self.column_tree.configure(yscrollcommand=col_scrollbar.set)
+        
+        self.column_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        col_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+    def create_context_menu(self):
+        """Create context menu for data treeview"""
+        self.context_menu = tk.Menu(self.root, tearoff=0)
+        self.context_menu.add_command(label="Copy Cell", command=self.copy_cell)
+        self.context_menu.add_command(label="Copy Row", command=self.copy_row)
+        self.context_menu.add_command(label="Copy Column", command=self.copy_column)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Filter by Value", command=self.filter_by_value)
+        self.context_menu.add_command(label="Show Column Stats", command=self.show_selected_column_stats)
+        
+        self.data_tree.bind("<Button-3>", self.show_context_menu)
+        
+    def create_status_bar(self):
+        """Create enhanced status bar"""
+        status_frame = ttk.Frame(self.root)
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        self.status_bar = ttk.Label(status_frame, text="Ready", relief=tk.SUNKEN, anchor=tk.W)
+        self.status_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Progress bar
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(status_frame, variable=self.progress_var, length=200)
+        self.progress_bar.pack(side=tk.RIGHT, padx=5)
+        self.progress_bar.pack_forget()  # Hidden by default
+        
+    def setup_bindings(self):
+        """Setup keyboard bindings and events"""
+        self.root.bind('<Control-o>', lambda e: self.open_database())
+        self.root.bind('<Control-f>', lambda e: self.focus_search())
+        self.root.bind('<Control-c>', lambda e: self.copy_selected())
+        self.root.bind('<F5>', lambda e: self.refresh_current_table())
+        self.root.bind('<Escape>', lambda e: self.clear_search())
+        
+    def update_status(self, message: str, show_progress: bool = False):
+        """Update status bar with optional progress bar"""
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        self.status_bar.config(text=f"{timestamp} - {message}")
+        
+        if show_progress:
+            self.progress_bar.pack(side=tk.RIGHT, padx=5)
+        else:
+            self.progress_bar.pack_forget()
+            
+        self.root.update_idletasks()
+        
+    def show_progress(self, value: float):
+        """Show progress bar with value (0-100)"""
+        self.progress_var.set(value)
+        self.root.update_idletasks()
+        
+    # Database operations
+    def open_database(self):
+        """Open database file dialog"""
+        filetypes = [
+            ("All Supported", "*.db;*.sqlite;*.sqlite3;*.mdb;*.accdb;*.csv;*.xlsx;*.xls;*.json"),
+            ("SQLite files", "*.db;*.sqlite;*.sqlite3"),
+            ("Access files", "*.mdb;*.accdb"),
+            ("CSV files", "*.csv"),
+            ("Excel files", "*.xlsx;*.xls"),
+            ("JSON files", "*.json"),
+            ("All files", "*.*")
+        ]
+        
+        filename = filedialog.askopenfilename(
+            title="Open Database or Data File",
+            filetypes=filetypes
+        )
+        
+        if filename:
+            self.load_database_file(filename)
+            
+    def load_database_file(self, filename: str):
+        """Load database file in background thread"""
+        def load_thread():
+            try:
+                self.root.after(0, lambda: self.update_status(f"Loading: {os.path.basename(filename)}", True))
+                self.root.after(0, lambda: self.show_progress(10))
+                
+                db_type = self.db_manager.detect_database_type(filename)
+                db_name = os.path.basename(filename)
+                
+                self.root.after(0, lambda: self.show_progress(30))
+                
+                if db_type == 'sqlite':
+                    connection = self.db_manager.connect_sqlite(filename)
+                    tables = self.db_manager.get_table_list(connection, 'sqlite')
+                elif db_type == 'access':
+                    connection = self.db_manager.connect_access(filename)
+                    tables = self.db_manager.get_table_list(connection, 'access')
+                elif db_type == 'csv':
+                    connection, table_name = self.db_manager.load_csv_as_database(filename)
+                    tables = [table_name]
+                    db_type = 'sqlite'  # Treat as SQLite for operations
+                elif db_type == 'excel':
+                    connection, table_names = self.db_manager.load_excel_as_database(filename)
+                    tables = table_names
+                    db_type = 'sqlite'  # Treat as SQLite for operations
+                elif db_type == 'json':
+                    connection, table_name = self.db_manager.load_json_as_database(filename)
+                    tables = [table_name]
+                    db_type = 'sqlite'  # Treat as SQLite for operations
+                else:
+                    raise ValueError(f"Unsupported file type: {db_type}")
+                
+                self.root.after(0, lambda: self.show_progress(80))
+                
+                # Store database info
+                db_info = {
+                    'connection': connection,
+                    'type': db_type,
+                    'path': filename,
+                    'tables': tables
+                }
+                
+                self.root.after(0, lambda: self.on_database_loaded(db_name, db_info))
+                
+            except Exception as e:
+                error_msg = f"Failed to load database: {str(e)}"
+                self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
+                self.root.after(0, lambda: self.update_status("Ready"))
+                
+        threading.Thread(target=load_thread, daemon=True).start()
+        
+    def on_database_loaded(self, db_name: str, db_info: Dict[str, Any]):
+        """Handle successful database loading"""
+        self.databases[db_name] = db_info
+        
+        # Update database list
+        if db_name not in self.db_listbox.get(0, tk.END):
+            self.db_listbox.insert(tk.END, db_name)
+            
+        # Select the database
+        for i in range(self.db_listbox.size()):
+            if self.db_listbox.get(i) == db_name:
+                self.db_listbox.selection_clear(0, tk.END)
+                self.db_listbox.selection_set(i)
+                self.db_listbox.activate(i)
+                break
+                
+        self.show_progress(100)
+        self.on_database_select(None)
+        self.update_status(f"Loaded: {db_name} ({len(db_info['tables'])} tables)")
+        
+    def on_database_select(self, event):
+        """Handle database selection"""
+        selection = self.db_listbox.curselection()
+        if not selection:
+            return
+            
+        db_name = self.db_listbox.get(selection[0])
+        self.current_db = db_name
+        
+        if db_name in self.databases:
+            tables = self.databases[db_name]['tables']
+            self.update_table_list(tables)
+            
+    def update_table_list(self, tables: List[str]):
+        """Update table list in UI"""
+        self.table_listbox.delete(0, tk.END)
+        for table in sorted(tables):
+            self.table_listbox.insert(tk.END, table)
+            
+    def on_table_select(self, event):
+        """Handle table selection"""
+        selection = self.table_listbox.curselection()
+        if not selection:
+            return
+            
+        table_name = self.table_listbox.get(selection[0])
+        self.current_table = table_name
+        
+    def on_table_double_click(self, event):
+        """Handle table double-click to load data"""
+        selection = self.table_listbox.curselection()
+        if not selection:
+            return
+            
+        table_name = self.table_listbox.get(selection[0])
+        self.current_table = table_name
+        self.load_table_data(table_name)
+        
+    def load_table_data(self, table_name: str):
+        """Load table data in background thread"""
+        if not self.current_db or self.current_db not in self.databases:
+            return
+            
+        def load_thread():
+            try:
+                self.root.after(0, lambda: self.update_status(f"Loading table: {table_name}", True))
+                self.root.after(0, lambda: self.show_progress(20))
+                
+                db_info = self.databases[self.current_db]
+                connection = db_info['connection']
+                db_type = db_info['type']
+                
+                # Get table info
+                table_info = self.db_manager.get_table_info(connection, table_name, db_type)
+                
+                self.root.after(0, lambda: self.show_progress(40))
+                
+                # Load data with limit for performance
+                limit_clause = f" LIMIT {self.max_display_rows}" if db_type == 'sqlite' else ""
+                query = f"SELECT * FROM [{table_name}]{limit_clause}" if db_type == 'access' else f"SELECT * FROM {table_name}{limit_clause}"
+                
+                df = self.db_manager.execute_query(connection, query)
+                
+                self.root.after(0, lambda: self.show_progress(70))
+                
+                # Optimize DataFrame for better performance
+                df = self.data_processor.optimize_dataframe(df)
+                
+                self.root.after(0, lambda: self.show_progress(90))
+                
+                # Update UI
+                self.root.after(0, lambda: self.display_table_data(df, table_info))
+                
+            except Exception as e:
+                error_msg = f"Failed to load table data: {str(e)}"
+                self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
+                self.root.after(0, lambda: self.update_status("Ready"))
+                
+        threading.Thread(target=load_thread, daemon=True).start()
+        
+    def display_table_data(self, df: pd.DataFrame, table_info: Dict[str, Any]):
+        """Display table data in treeview"""
+        # Store current data
+        self.current_data = df
+        self.filtered_data = df.copy()
+        
+        # Clear existing data
+        for item in self.data_tree.get_children():
+            self.data_tree.delete(item)
+            
+        # Configure columns
+        columns = list(df.columns)
+        self.data_tree['columns'] = columns
+        self.data_tree['show'] = 'headings'
+        
+        # Configure column headings and widths
+        for col in columns:
+            self.data_tree.heading(col, text=col, command=lambda c=col: self.sort_by_column(c))
+            # Auto-size columns based on content
+            max_width = max(
+                len(str(col)) * 8,  # Header width
+                df[col].astype(str).str.len().max() * 8 if not df.empty else 50  # Content width
+            )
+            self.data_tree.column(col, width=min(max_width, 200), minwidth=50)
+            
+        # Insert data (limit for performance)
+        display_rows = min(len(df), 5000)  # Limit displayed rows
+        for index in range(display_rows):
+            row = df.iloc[index]
+            values = [str(val) if pd.notna(val) else '' for val in row]
+            self.data_tree.insert('', 'end', values=values)
+            
+        # Update info labels
+        self.table_info_label.config(text=f"Table: {self.current_table}")
+        
+        total_rows = table_info.get('row_count', len(df))
+        if display_rows < total_rows:
+            self.row_count_label.config(text=f"Showing: {display_rows:,} of {total_rows:,} rows")
+        else:
+            self.row_count_label.config(text=f"Rows: {total_rows:,}")
+            
+        # Update column info
+        self.update_column_info(df)
+        
+        self.show_progress(100)
+        self.update_status(f"Loaded {display_rows:,} rows from {self.current_table}")
+        
+    def update_column_info(self, df: pd.DataFrame):
+        """Update column information tab"""
+        # Clear existing items
+        for item in self.column_tree.get_children():
+            self.column_tree.delete(item)
+            
+        # Add column statistics
+        for col in df.columns:
+            stats = self.data_processor.get_column_stats(df, col)
+            
+            # Format statistics string
+            stats_str = ""
+            if 'min' in stats and 'max' in stats:
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    stats_str = f"Min: {stats['min']:.2f}, Max: {stats['max']:.2f}"
+                    if 'mean' in stats:
+                        stats_str += f", Mean: {stats['mean']:.2f}"
+                else:
+                    stats_str = f"Range: {stats['min']} to {stats['max']}"
+            elif 'top_values' in stats:
+                top_val = list(stats['top_values'].keys())[0] if stats['top_values'] else 'N/A'
+                stats_str = f"Most common: {top_val}"
+                
+            self.column_tree.insert('', 'end', text=col, values=(
+                stats['type'],
+                stats['null_count'],
+                stats['unique_count'],
+                stats_str
+            ))
+            
+    # Search and filter functionality
+    def focus_search(self):
+        """Focus on search entry"""
+        self.search_entry.focus_set()
+        
+    def search_data(self, event=None):
+        """Search data in current table"""
+        search_term = self.search_var.get().strip()
+        if not search_term or self.current_data is None:
+            self.filtered_data = self.current_data.copy() if self.current_data is not None else None
+            self.refresh_display()
+            return
+            
+        def search_thread():
+            try:
+                self.root.after(0, lambda: self.update_status(f"Searching for: {search_term}", True))
+                
+                # Perform search
+                filtered_df = self.data_processor.search_dataframe(self.current_data, search_term)
+                
+                # Update UI
+                self.root.after(0, lambda: self.display_search_results(filtered_df, search_term))
+                
+            except Exception as e:
+                error_msg = f"Search failed: {str(e)}"
+                self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
+                
+        threading.Thread(target=search_thread, daemon=True).start()
+        
+    def on_search_change(self, event=None):
+        """Handle search text change with delay"""
+        # Cancel previous search timer
+        if hasattr(self, 'search_timer'):
+            self.root.after_cancel(self.search_timer)
+            
+        # Set new search timer (500ms delay)
+        self.search_timer = self.root.after(500, self.search_data)
+        
+    def display_search_results(self, df: pd.DataFrame, search_term: str):
+        """Display search results"""
+        self.filtered_data = df
+        
+        # Clear and update treeview
+        for item in self.data_tree.get_children():
+            self.data_tree.delete(item)
+            
+        # Insert filtered data
+        display_rows = min(len(df), 5000)
+        for index in range(display_rows):
+            row = df.iloc[index]
+            values = [str(val) if pd.notna(val) else '' for val in row]
+            self.data_tree.insert('', 'end', values=values)
+            
+        # Update row count
+        if len(df) > 0:
+            self.row_count_label.config(text=f"Found: {len(df):,} matches")
+        else:
+            self.row_count_label.config(text="No matches found")
+            
+        self.update_status(f"Search completed: {len(df)} results for '{search_term}'")
+        
+    def clear_search(self):
+        """Clear search and show all data"""
+        self.search_var.set("")
+        if self.current_data is not None:
+            self.filtered_data = self.current_data.copy()
+            self.refresh_display()
+            
+    def refresh_display(self):
+        """Refresh the current display"""
+        if self.filtered_data is not None:
+            # Clear and update treeview
+            for item in self.data_tree.get_children():
+                self.data_tree.delete(item)
+                
+            # Insert current filtered data
+            display_rows = min(len(self.filtered_data), 5000)
+            for index in range(display_rows):
+                row = self.filtered_data.iloc[index]
+                values = [str(val) if pd.notna(val) else '' for val in row]
+                self.data_tree.insert('', 'end', values=values)
+                
+            # Update row count
+            total_rows = len(self.current_data) if self.current_data is not None else 0
+            if len(self.filtered_data) < total_rows:
+                self.row_count_label.config(text=f"Filtered: {len(self.filtered_data):,} of {total_rows:,} rows")
+            else:
+                self.row_count_label.config(text=f"Rows: {total_rows:,}")
+                
+    # Context menu functions
+    def show_context_menu(self, event):
+        """Show context menu"""
+        self.context_menu.post(event.x_root, event.y_root)
+        
+    def copy_cell(self):
+        """Copy selected cell to clipboard"""
+        selection = self.data_tree.selection()
+        if selection:
+            item = selection[0]
+            col = self.data_tree.identify_column(self.data_tree.winfo_pointerx() - self.data_tree.winfo_rootx())
+            if col:
+                col_index = int(col[1:]) - 1
+                values = self.data_tree.item(item)['values']
+                if col_index < len(values):
+                    self.root.clipboard_clear()
+                    self.root.clipboard_append(str(values[col_index]))
+                    
+    def copy_row(self):
+        """Copy selected row to clipboard"""
+        selection = self.data_tree.selection()
+        if selection:
+            item = selection[0]
+            values = self.data_tree.item(item)['values']
+            row_text = '\t'.join(str(val) for val in values)
+            self.root.clipboard_clear()
+            self.root.clipboard_append(row_text)
+            
+    def copy_column(self):
+        """Copy selected column to clipboard"""
+        # Implementation for copying entire column
+        pass
+        
+    def copy_selected(self):
+        """Copy selected data to clipboard"""
+        selection = self.data_tree.selection()
+        if selection:
+            rows = []
+            for item in selection:
+                values = self.data_tree.item(item)['values']
+                rows.append('\t'.join(str(val) for val in values))
+            
+            if rows:
+                self.root.clipboard_clear()
+                self.root.clipboard_append('\n'.join(rows))
+                self.update_status(f"Copied {len(rows)} rows to clipboard")
+                
+    # Import functions
+    def show_import_menu(self):
+        """Show import menu"""
+        import_menu = tk.Menu(self.root, tearoff=0)
+        import_menu.add_command(label="CSV File...", command=self.import_csv)
+        import_menu.add_command(label="Excel File...", command=self.import_excel)
+        import_menu.add_command(label="JSON File...", command=self.import_json)
+        
+        # Show menu at button location
+        import_menu.post(self.root.winfo_pointerx(), self.root.winfo_pointery())
+        
+    def import_csv(self):
+        """Import CSV file"""
+        filename = filedialog.askopenfilename(
+            title="Import CSV File",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        if filename:
+            self.load_database_file(filename)
+            
+    def import_excel(self):
+        """Import Excel file"""
+        filename = filedialog.askopenfilename(
+            title="Import Excel File",
+            filetypes=[("Excel files", "*.xlsx;*.xls"), ("All files", "*.*")]
+        )
+        if filename:
+            self.load_database_file(filename)
+            
+    def import_json(self):
+        """Import JSON file"""
+        filename = filedialog.askopenfilename(
+            title="Import JSON File",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        if filename:
+            self.load_database_file(filename)
+            
+    # Export functions
+    def export_table(self):
+        """Export current table"""
+        if self.current_data is None:
+            messagebox.showwarning("Warning", "No data to export")
+            return
+            
+        filename = filedialog.asksaveasfilename(
+            title="Export Table",
+            defaultextension=".csv",
+            filetypes=[
+                ("CSV files", "*.csv"),
+                ("Excel files", "*.xlsx"),
+                ("JSON files", "*.json")
+            ]
+        )
+        
+        if filename:
+            self.export_data_to_file(self.current_data, filename)
+            
+    def export_filtered(self):
+        """Export filtered data"""
+        if self.filtered_data is None:
+            messagebox.showwarning("Warning", "No filtered data to export")
+            return
+            
+        filename = filedialog.asksaveasfilename(
+            title="Export Filtered Data",
+            defaultextension=".csv",
+            filetypes=[
+                ("CSV files", "*.csv"),
+                ("Excel files", "*.xlsx"),
+                ("JSON files", "*.json")
+            ]
+        )
+        
+        if filename:
+            self.export_data_to_file(self.filtered_data, filename)
+            
+    def export_data_to_file(self, df: pd.DataFrame, filename: str):
+        """Export DataFrame to file"""
+        def export_thread():
+            try:
+                self.root.after(0, lambda: self.update_status(f"Exporting to: {os.path.basename(filename)}", True))
+                
+                ext = os.path.splitext(filename)[1].lower()
+                if ext == '.csv':
+                    df.to_csv(filename, index=False)
+                elif ext == '.xlsx':
+                    df.to_excel(filename, index=False)
+                elif ext == '.json':
+                    df.to_json(filename, orient='records', indent=2)
+                    
+                self.root.after(0, lambda: self.update_status(f"Exported: {os.path.basename(filename)}"))
+                
+            except Exception as e:
+                error_msg = f"Export failed: {str(e)}"
+                self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
+                
+        threading.Thread(target=export_thread, daemon=True).start()
+        
+    # Utility functions
+    def sort_by_column(self, column: str):
+        """Sort data by column"""
+        if self.filtered_data is not None:
+            try:
+                # Toggle sort order
+                if hasattr(self, 'last_sort_column') and self.last_sort_column == column:
+                    self.sort_ascending = not getattr(self, 'sort_ascending', True)
+                else:
+                    self.sort_ascending = True
+                    
+                self.last_sort_column = column
+                
+                # Sort data
+                self.filtered_data = self.filtered_data.sort_values(
+                    by=column, 
+                    ascending=self.sort_ascending,
+                    na_position='last'
+                )
+                
+                self.refresh_display()
+                
+                order_text = "ascending" if self.sort_ascending else "descending"
+                self.update_status(f"Sorted by {column} ({order_text})")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Sort failed: {str(e)}")
+                
+    def refresh_current_table(self):
+        """Refresh current table data"""
+        if self.current_table:
+            self.load_table_data(self.current_table)
+            
+    def filter_by_value(self):
+        """Filter by selected cell value"""
+        # Implementation for filtering by cell value
+        pass
+        
+    def show_selected_column_stats(self):
+        """Show statistics for selected column"""
+        # Implementation for showing column statistics
+        pass
+        
+    def show_column_stats(self):
+        """Show column statistics dialog"""
+        # Implementation for column statistics dialog
+        pass
+        
+    def show_data_stats(self):
+        """Show data statistics dialog"""
+        if self.current_data is None:
+            messagebox.showwarning("Warning", "No data loaded")
+            return
+            
+        # Create statistics window
+        stats_window = tk.Toplevel(self.root)
+        stats_window.title("Data Statistics")
+        stats_window.geometry("600x400")
+        
+        # Create text widget for stats
+        text_widget = tk.Text(stats_window, wrap=tk.WORD, padx=10, pady=10)
+        scrollbar = ttk.Scrollbar(stats_window, orient=tk.VERTICAL, command=text_widget.yview)
+        text_widget.configure(yscrollcommand=scrollbar.set)
+        
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Generate statistics
+        stats_text = f"Dataset Overview\n{'='*50}\n\n"
+        stats_text += f"Table: {self.current_table}\n"
+        stats_text += f"Rows: {len(self.current_data):,}\n"
+        stats_text += f"Columns: {len(self.current_data.columns)}\n\n"
+        
+        stats_text += "Column Information\n" + "-"*30 + "\n"
+        for col in self.current_data.columns:
+            col_stats = self.data_processor.get_column_stats(self.current_data, col)
+            stats_text += f"\n{col}:\n"
+            stats_text += f"  Type: {col_stats['type']}\n"
+            stats_text += f"  Null values: {col_stats['null_count']}\n"
+            stats_text += f"  Unique values: {col_stats['unique_count']}\n"
+            
+            if 'min' in col_stats:
+                stats_text += f"  Min: {col_stats['min']}\n"
+                stats_text += f"  Max: {col_stats['max']}\n"
+                if 'mean' in col_stats:
+                    stats_text += f"  Mean: {col_stats['mean']:.2f}\n"
+                    stats_text += f"  Std: {col_stats['std']:.2f}\n"
+                    
+        text_widget.insert('1.0', stats_text)
+        text_widget.config(state=tk.DISABLED)
+        
+    def open_sql_query(self):
+        """Open SQL query dialog"""
+        # Implementation for SQL query interface
+        messagebox.showinfo("Info", "SQL Query interface coming soon!")
+        
+    def open_settings(self):
+        """Open settings dialog"""
+        # Implementation for settings dialog
+        messagebox.showinfo("Info", "Settings dialog coming soon!")
+        
+    def increase_font(self):
+        """Increase font size"""
+        # Implementation for font size increase
+        pass
+        
+    def decrease_font(self):
+        """Decrease font size"""
+        # Implementation for font size decrease
+        pass
+        
+    def show_shortcuts(self):
+        """Show keyboard shortcuts"""
+        shortcuts = """
+Keyboard Shortcuts
+==================
+
+File Operations:
+  Ctrl+O    Open Database
+  Ctrl+S    Save (if applicable)
+
+Navigation:
+  F5        Refresh current table
+  Ctrl+F    Focus search box
+  Escape    Clear search
+
+Data Operations:
+  Ctrl+C    Copy selected rows
+  Ctrl+A    Select all (in treeview)
+
+View:
+  +         Increase font size
+  -         Decrease font size
+"""
+        messagebox.showinfo("Keyboard Shortcuts", shortcuts)
+        
+    def show_about(self):
+        """Show about dialog"""
+        about_text = """
+ShadowHawk Database Browser v2.0
+
+A fast and modern desktop application for browsing local databases and data files.
+
+Supported formats:
+• SQLite (.db, .sqlite, .sqlite3)
+• Microsoft Access (.mdb, .accdb)
+• CSV files (.csv)
+• Excel files (.xlsx, .xls)
+• JSON files (.json)
+
+Features:
+• Fast data loading and display
+• Advanced search and filtering
+• Data export capabilities
+• Column statistics
+• Multi-threaded operations
+
+Built with Python, tkinter, and pandas.
+"""
+        messagebox.showinfo("About ShadowHawk Database Browser", about_text)
+        
+    def load_settings(self):
+        """Load application settings"""
+        # Implementation for loading settings from file
+        pass
+        
+    def save_settings(self):
+        """Save application settings"""
+        # Implementation for saving settings to file
+        pass
+        
+    def run(self):
+        """Start the application"""
+        self.root.mainloop()
+
+if __name__ == "__main__":
+    app = ShadowHawkBrowser()
+    app.run()
