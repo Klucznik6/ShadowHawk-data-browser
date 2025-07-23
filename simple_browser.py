@@ -84,6 +84,12 @@ class SimpleDatabaseBrowser:
         ttk.Button(toolbar, text="Export", command=self.export_table).pack(side=tk.LEFT, padx=2)
         
         # Search
+        # Global search toggle
+        self.global_search_var = tk.BooleanVar()
+        global_search_cb = ttk.Checkbutton(toolbar, text="Search All DBs", 
+                                         variable=self.global_search_var)
+        global_search_cb.pack(side=tk.RIGHT, padx=2)
+        
         ttk.Label(toolbar, text="Search:").pack(side=tk.RIGHT, padx=2)
         self.search_var = tk.StringVar()
         self.search_entry = ttk.Entry(toolbar, textvariable=self.search_var, width=20)
@@ -399,9 +405,20 @@ class SimpleDatabaseBrowser:
         self.update_status(f"Loaded {len(df)} rows from {self.current_table}")
         
     def search_data(self, event=None):
-        """Search data in current table"""
+        """Search data in current table or across all databases"""
         search_term = self.search_var.get().strip()
-        if not search_term or self.current_data is None:
+        if not search_term:
+            return
+            
+        # Check if global search is enabled
+        if self.global_search_var.get():
+            self.perform_global_search(search_term)
+        else:
+            self.perform_local_search(search_term)
+    
+    def perform_local_search(self, search_term: str):
+        """Search data in current table only"""
+        if self.current_data is None:
             return
             
         # Simple search in displayed data
@@ -422,6 +439,109 @@ class SimpleDatabaseBrowser:
             
         self.row_count_label.config(text=f"Search results: {len(filtered_df)} rows")
         self.update_status(f"Search completed: {len(filtered_df)} results")
+    
+    def perform_global_search(self, search_term: str):
+        """Search across all loaded databases and tables"""
+        if not self.connections:
+            messagebox.showinfo("Global Search", "No databases loaded for global search.")
+            return
+            
+        def global_search_thread():
+            try:
+                self.update_status(f"Searching all databases for: {search_term}")
+                
+                all_results = []
+                search_summary = []
+                
+                for db_name, db_info in self.connections.items():
+                    connection = db_info['connection']
+                    tables = db_info.get('tables', [])
+                    
+                    # If no tables info stored, get them from connection
+                    if not tables:
+                        try:
+                            cursor = connection.cursor()
+                            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+                            tables = [row[0] for row in cursor.fetchall()]
+                        except Exception as e:
+                            print(f"Error getting tables for {db_name}: {e}")
+                            continue
+                    
+                    for table_name in tables:
+                        try:
+                            # Load table data
+                            df = pd.read_sql_query(f"SELECT * FROM {table_name}", connection)
+                            
+                            # Search in this table
+                            mask = df.astype(str).apply(
+                                lambda x: x.str.contains(search_term, case=False, na=False)
+                            ).any(axis=1)
+                            
+                            matches = df[mask]
+                            
+                            if len(matches) > 0:
+                                # Add database and table info to each row
+                                matches = matches.copy()
+                                matches.insert(0, '_database', db_name)
+                                matches.insert(1, '_table', table_name)
+                                all_results.append(matches)
+                                search_summary.append(f"{db_name}.{table_name}: {len(matches)} matches")
+                                
+                        except Exception as e:
+                            print(f"Error searching table {db_name}.{table_name}: {e}")
+                            continue
+                
+                # Update UI in main thread
+                self.root.after(0, lambda: self.display_global_results(all_results, search_summary, search_term))
+                
+            except Exception as e:
+                error_msg = f"Global search failed: {str(e)}"
+                self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
+                
+        threading.Thread(target=global_search_thread, daemon=True).start()
+    
+    def display_global_results(self, all_results, search_summary, search_term):
+        """Display global search results"""
+        # Clear treeview
+        for item in self.data_tree.get_children():
+            self.data_tree.delete(item)
+            
+        if all_results:
+            # Combine all results
+            combined_results = pd.concat(all_results, ignore_index=True, sort=False)
+            
+            # Update treeview columns to include database and table info
+            columns = list(combined_results.columns)
+            self.data_tree["columns"] = columns
+            self.data_tree["show"] = "headings"
+            
+            # Configure column headers
+            for col in columns:
+                self.data_tree.heading(col, text=col)
+                if col in ['_database', '_table']:
+                    self.data_tree.column(col, width=120, minwidth=80)
+                else:
+                    self.data_tree.column(col, width=100, minwidth=50)
+            
+            # Insert data (limit to 2000 rows for performance in simple browser)
+            display_rows = min(len(combined_results), 2000)
+            for index in range(display_rows):
+                row = combined_results.iloc[index]
+                values = [str(val) if pd.notna(val) else '' for val in row]
+                self.data_tree.insert('', 'end', values=values)
+            
+            # Update status
+            self.table_info_label.config(text="Global Search Results")
+            self.row_count_label.config(text=f"Found: {len(combined_results):,} matches across all databases")
+            
+            # Show summary
+            summary_text = f"Global search found {len(combined_results)} total matches in {len(search_summary)} tables:\n" + "\n".join(search_summary)
+            messagebox.showinfo("Global Search Results", summary_text)
+            
+        else:
+            self.row_count_label.config(text="No matches found in any database")
+            
+        self.update_status(f"Global search completed: {len(all_results) if all_results else 0} total results")
         
     def refresh_current_table(self):
         """Refresh current table data"""

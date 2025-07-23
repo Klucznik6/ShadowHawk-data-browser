@@ -157,6 +157,13 @@ class ShadowHawkBrowser:
         search_frame = ttk.LabelFrame(toolbar_frame, text="Search", padding=5)
         search_frame.pack(side=tk.RIGHT, padx=2)
         
+        # Global search toggle
+        self.global_search_var = tk.BooleanVar()
+        global_search_cb = ttk.Checkbutton(search_frame, text="Search All DBs", 
+                                         variable=self.global_search_var,
+                                         command=self.on_global_search_toggle)
+        global_search_cb.pack(side=tk.LEFT, padx=2)
+        
         self.search_var = tk.StringVar()
         self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=25)
         self.search_entry.pack(side=tk.LEFT, padx=2)
@@ -608,16 +615,28 @@ class ShadowHawkBrowser:
         self.search_entry.focus_set()
         
     def search_data(self, event=None):
-        """Search data in current table"""
+        """Search data in current table or across all databases"""
         search_term = self.search_var.get().strip()
-        if not search_term or self.current_data is None:
-            self.filtered_data = self.current_data.copy() if self.current_data is not None else None
-            self.refresh_display()
+        if not search_term:
+            if self.current_data is not None:
+                self.filtered_data = self.current_data.copy()
+                self.refresh_display()
+            return
+            
+        # Check if global search is enabled
+        if self.global_search_var.get():
+            self.perform_global_search(search_term)
+        else:
+            self.perform_local_search(search_term)
+    
+    def perform_local_search(self, search_term: str):
+        """Search data in current table only"""
+        if self.current_data is None:
             return
             
         def search_thread():
             try:
-                self.root.after(0, lambda: self.update_status(f"Searching for: {search_term}", True))
+                self.root.after(0, lambda: self.update_status(f"Searching current table for: {search_term}", True))
                 
                 # Perform search
                 filtered_df = self.data_processor.search_dataframe(self.current_data, search_term)
@@ -630,6 +649,96 @@ class ShadowHawkBrowser:
                 self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
                 
         threading.Thread(target=search_thread, daemon=True).start()
+    
+    def perform_global_search(self, search_term: str):
+        """Search across all loaded databases and tables"""
+        if not self.databases:
+            messagebox.showinfo("Global Search", "No databases loaded for global search.")
+            return
+            
+        def global_search_thread():
+            try:
+                self.root.after(0, lambda: self.update_status(f"Searching all databases for: {search_term}", True))
+                
+                # Use enhanced search functionality
+                search_results = self.data_processor.search_all_databases(
+                    self.databases, search_term, self.db_manager
+                )
+                
+                # Prepare summary text
+                if search_results['total_matches'] > 0:
+                    summary_lines = [
+                        f"Global search found {search_results['total_matches']} total matches",
+                        f"Searched {search_results['tables_searched']} tables in {search_results['databases_searched']} databases",
+                        "",
+                        "Results by table:"
+                    ]
+                    
+                    for result in search_results['summary']:
+                        summary_lines.append(
+                            f"  {result['database']}.{result['table']}: {result['match_count']} matches "
+                            f"(out of {result['total_rows']} total rows)"
+                        )
+                    
+                    summary_text = "\n".join(summary_lines)
+                    
+                    # Combine all results
+                    if search_results['matches']:
+                        combined_results = pd.concat(search_results['matches'], ignore_index=True, sort=False)
+                    else:
+                        combined_results = pd.DataFrame()
+                else:
+                    combined_results = pd.DataFrame()
+                    summary_text = f"No matches found for '{search_term}' in any loaded database."
+                
+                # Update UI
+                self.root.after(0, lambda: self.display_global_search_results(combined_results, search_term, summary_text))
+                
+            except Exception as e:
+                error_msg = f"Global search failed: {str(e)}"
+                self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
+                
+        threading.Thread(target=global_search_thread, daemon=True).start()
+    
+    def display_global_search_results(self, df: pd.DataFrame, search_term: str, summary: str):
+        """Display global search results"""
+        self.filtered_data = df
+        
+        # Clear and update treeview
+        for item in self.data_tree.get_children():
+            self.data_tree.delete(item)
+            
+        if len(df) > 0:
+            # Update treeview columns to include database and table info
+            columns = list(df.columns)
+            self.data_tree["columns"] = columns
+            self.data_tree["show"] = "headings"
+            
+            # Configure column headers
+            for col in columns:
+                self.data_tree.heading(col, text=col)
+                if col in ['_database', '_table']:
+                    self.data_tree.column(col, width=120, minwidth=80)
+                else:
+                    self.data_tree.column(col, width=100, minwidth=50)
+            
+            # Insert data (limit to 5000 rows for performance)
+            display_rows = min(len(df), 5000)
+            for index in range(display_rows):
+                row = df.iloc[index]
+                values = [str(val) if pd.notna(val) else '' for val in row]
+                self.data_tree.insert('', 'end', values=values)
+            
+            # Update info
+            self.table_info_label.config(text="Global Search Results")
+            self.row_count_label.config(text=f"Found: {len(df):,} matches across all databases")
+            
+            # Show summary dialog
+            messagebox.showinfo("Global Search Results", summary)
+        else:
+            self.row_count_label.config(text="No matches found in any database")
+            
+        self.update_status(f"Global search completed: {len(df)} total results for '{search_term}'")
         
     def on_search_change(self, event=None):
         """Handle search text change with delay"""
@@ -639,6 +748,20 @@ class ShadowHawkBrowser:
             
         # Set new search timer (500ms delay)
         self.search_timer = self.root.after(500, self.search_data)
+    
+    def on_global_search_toggle(self):
+        """Handle global search toggle"""
+        if self.global_search_var.get():
+            self.update_status("Global search enabled - will search across all loaded databases")
+            # Clear current search to avoid confusion
+            if self.search_var.get().strip():
+                self.clear_search()
+        else:
+            self.update_status("Global search disabled - will search current table only")
+            # If we're showing global results, clear them
+            if hasattr(self, 'filtered_data') and self.filtered_data is not None:
+                if '_database' in self.filtered_data.columns:
+                    self.clear_search()
         
     def display_search_results(self, df: pd.DataFrame, search_term: str):
         """Display search results"""
@@ -666,7 +789,15 @@ class ShadowHawkBrowser:
     def clear_search(self):
         """Clear search and show all data"""
         self.search_var.set("")
-        if self.current_data is not None:
+        
+        # If we have global search results, we need to reload the current table
+        if (hasattr(self, 'filtered_data') and self.filtered_data is not None and 
+            '_database' in self.filtered_data.columns):
+            # We're showing global search results, reload current table
+            if self.current_table and self.current_db:
+                self.load_table_data(self.current_table)
+        elif self.current_data is not None:
+            # Regular local search, just restore current data
             self.filtered_data = self.current_data.copy()
             self.refresh_display()
             

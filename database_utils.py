@@ -209,16 +209,78 @@ class DataProcessor:
         for col in columns:
             if df[col].dtype == 'object' or df[col].dtype.name == 'category':
                 # String search
-                mask |= df[col].astype(str).str.lower().str.contains(search_term, na=False)
+                mask |= df[col].astype(str).str.lower().str.contains(search_term, na=False, regex=False)
             else:
                 # Numeric search
                 try:
                     numeric_search = float(search_term)
                     mask |= df[col] == numeric_search
                 except ValueError:
-                    pass
+                    # Try partial numeric search (for searching part of numbers)
+                    mask |= df[col].astype(str).str.contains(search_term, na=False, regex=False)
                     
         return df[mask]
+    
+    @staticmethod
+    def search_all_databases(databases: Dict[str, Any], search_term: str, db_manager: 'DatabaseManager') -> Dict[str, Any]:
+        """Search across all databases and return consolidated results"""
+        results = {
+            'matches': [],
+            'summary': [],
+            'total_matches': 0,
+            'tables_searched': 0,
+            'databases_searched': 0
+        }
+        
+        for db_name, db_info in databases.items():
+            connection = db_info['connection']
+            db_type = db_info['type']
+            
+            try:
+                tables = db_manager.get_table_list(connection, db_type)
+                
+                for table_name in tables:
+                    results['tables_searched'] += 1
+                    
+                    try:
+                        # Load table data
+                        if db_type == 'sqlite':
+                            query = f"SELECT * FROM {table_name}"
+                        else:
+                            query = f"SELECT * FROM [{table_name}]"
+                        
+                        df = db_manager.execute_query(connection, query)
+                        
+                        # Search in this table
+                        matches = DataProcessor.search_dataframe(df, search_term)
+                        
+                        if len(matches) > 0:
+                            # Add metadata columns
+                            matches = matches.copy()
+                            matches.insert(0, '_database', db_name)
+                            matches.insert(1, '_table', table_name)
+                            matches.insert(2, '_source_row', matches.index)
+                            
+                            results['matches'].append(matches)
+                            results['summary'].append({
+                                'database': db_name,
+                                'table': table_name,
+                                'match_count': len(matches),
+                                'total_rows': len(df)
+                            })
+                            results['total_matches'] += len(matches)
+                            
+                    except Exception as e:
+                        print(f"Error searching table {db_name}.{table_name}: {e}")
+                        continue
+                        
+                results['databases_searched'] += 1
+                
+            except Exception as e:
+                print(f"Error searching database {db_name}: {e}")
+                continue
+        
+        return results
     
     @staticmethod
     def get_column_stats(df: pd.DataFrame, column: str) -> Dict[str, Any]:
