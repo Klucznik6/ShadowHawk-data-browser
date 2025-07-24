@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """
-Performance Testing Script for ShadowHawk Database Browser
+Performance Testing Script for ShadowHawk Database Browser - Updated for Polars
 """
 
 import time
 import os
 import pandas as pd
+import polars as pl
+import numpy as np
+import tempfile
+from polars_database_utils import PolarsDatabaseManager
 from fast_database_utils import FastDatabaseManager
 from database_utils import DatabaseManager, DataProcessor
 

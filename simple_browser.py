@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ShadowHawk Database Browser - Simple Version
+ShadowHawk Database Browser - Simple Version with Polars Ultra-Speed
 Fast desktop application for browsing local databases and data files.
 """
 
@@ -13,6 +13,9 @@ import os
 from datetime import datetime
 import json
 
+# Import Polars for ultra-fast performance
+from polars_database_utils import PolarsDatabaseManager
+
 try:
     from ttkthemes import ThemedTk
     THEMED_TK_AVAILABLE = True
@@ -20,7 +23,7 @@ except ImportError:
     THEMED_TK_AVAILABLE = False
 
 class SimpleDatabaseBrowser:
-    """Simple database browser with essential functionality"""
+    """Simple database browser with Polars ultra-fast functionality"""
     
     def __init__(self):
         # Initialize main window
@@ -29,7 +32,7 @@ class SimpleDatabaseBrowser:
         else:
             self.root = tk.Tk()
             
-        self.root.title("ShadowHawk Database Browser - Simple")
+        self.root.title("ShadowHawk Database Browser - Simple (Polars Ultra-Fast)")
         self.root.geometry("1200x800")
         self.root.minsize(800, 600)
         
@@ -38,6 +41,9 @@ class SimpleDatabaseBrowser:
         self.current_db = None
         self.current_table = None
         self.current_data = None
+        
+        # Initialize Polars manager for ultra-fast operations
+        self.polars_manager = PolarsDatabaseManager()
         
         # Setup UI
         self.setup_ui()
@@ -212,37 +218,39 @@ class SimpleDatabaseBrowser:
                     }
                     
                 elif ext == '.csv':
-                    # CSV file
-                    conn = sqlite3.connect(':memory:', check_same_thread=False)
-                    df = pd.read_csv(filename)
-                    table_name = os.path.splitext(os.path.basename(filename))[0].replace(' ', '_').replace('-', '_')
-                    df.to_sql(table_name, conn, if_exists='replace', index=False)
+                    # Ultra-fast CSV loading with Polars
+                    self.status_label.config(text="🚀 Loading CSV with Polars ultra-speed...")
+                    
+                    def progress_callback(message, progress):
+                        self.status_label.config(text=message)
+                        self.root.update_idletasks()
+                    
+                    conn, table_name = self.polars_manager.load_csv_polars(filename, progress_callback)
                     
                     db_info = {
                         'connection': conn,
                         'type': 'sqlite',
                         'path': filename,
+                        'filename': filename,  # For Polars cache access
                         'tables': [table_name]
                     }
                     
                 elif ext in ['.xlsx', '.xls']:
-                    # Excel file
-                    conn = sqlite3.connect(':memory:', check_same_thread=False)
-                    excel_file = pd.ExcelFile(filename)
-                    tables = []
+                    # Ultra-fast Excel loading with Polars optimization
+                    self.status_label.config(text="🚀 Loading Excel with Polars optimization...")
                     
-                    base_name = os.path.splitext(os.path.basename(filename))[0]
-                    for sheet_name in excel_file.sheet_names:
-                        df = pd.read_excel(filename, sheet_name=sheet_name)
-                        table_name = f"{base_name}_{sheet_name}".replace(' ', '_').replace('-', '_')
-                        df.to_sql(table_name, conn, if_exists='replace', index=False)
-                        tables.append(table_name)
+                    def progress_callback(message, progress):
+                        self.status_label.config(text=message)
+                        self.root.update_idletasks()
+                    
+                    conn, table_names = self.polars_manager.load_excel_polars(filename, progress_callback)
                         
                     db_info = {
                         'connection': conn,
                         'type': 'sqlite',
                         'path': filename,
-                        'tables': tables
+                        'filename': filename,  # For Polars cache access
+                        'tables': table_names
                     }
                     
                 elif ext == '.json':
@@ -441,61 +449,53 @@ class SimpleDatabaseBrowser:
         self.update_status(f"Search completed: {len(filtered_df)} results")
     
     def perform_global_search(self, search_term: str):
-        """Search across all loaded databases and tables"""
+        """Ultra-fast search across all loaded databases using Polars"""
         if not self.connections:
             messagebox.showinfo("Global Search", "No databases loaded for global search.")
             return
             
         def global_search_thread():
             try:
-                self.update_status(f"Searching all databases for: {search_term}")
+                self.update_status(f"🚀 Ultra-fast search for: {search_term}")
                 
-                all_results = []
+                # Progress callback
+                def progress_callback(message, progress):
+                    self.root.after(0, lambda: self.update_status(message))
+                
+                # Use Polars ultra-fast global search
+                search_results = self.polars_manager.ultra_parallel_global_search(
+                    self.connections, search_term, progress_callback
+                )
+                
+                # Format results for display
+                all_results = search_results['matches']
+                
+                # Create enhanced summary
                 search_summary = []
-                
-                for db_name, db_info in self.connections.items():
-                    connection = db_info['connection']
-                    tables = db_info.get('tables', [])
+                if search_results['total_matches'] > 0:
+                    search_summary.append(f"🎯 Found {search_results['total_matches']} total matches")
+                    search_summary.append(f"⚡ Searched {search_results['tables_searched']} tables in {search_results['databases_searched']} databases")
+                    search_summary.append("")
                     
-                    # If no tables info stored, get them from connection
-                    if not tables:
-                        try:
-                            cursor = connection.cursor()
-                            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-                            tables = [row[0] for row in cursor.fetchall()]
-                        except Exception as e:
-                            print(f"Error getting tables for {db_name}: {e}")
-                            continue
+                    for result in search_results['summary']:
+                        search_summary.append(f"📋 {result['database']}.{result['table']}: {result['match_count']} matches")
                     
-                    for table_name in tables:
-                        try:
-                            # Load table data
-                            df = pd.read_sql_query(f"SELECT * FROM {table_name}", connection)
-                            
-                            # Search in this table
-                            mask = df.astype(str).apply(
-                                lambda x: x.str.contains(search_term, case=False, na=False)
-                            ).any(axis=1)
-                            
-                            matches = df[mask]
-                            
-                            if len(matches) > 0:
-                                # Add database and table info to each row
-                                matches = matches.copy()
-                                matches.insert(0, '_database', db_name)
-                                matches.insert(1, '_table', table_name)
-                                all_results.append(matches)
-                                search_summary.append(f"{db_name}.{table_name}: {len(matches)} matches")
-                                
-                        except Exception as e:
-                            print(f"Error searching table {db_name}.{table_name}: {e}")
-                            continue
+                    # Add performance info
+                    perf_stats = self.polars_manager.get_performance_stats()
+                    search_summary.extend([
+                        "",
+                        "🚀 Performance:",
+                        f"  ⚡ Polars tables: {perf_stats['polars_cached_tables']}",
+                        f"  💾 Memory: {perf_stats['polars_memory_usage_mb']:.1f} MB"
+                    ])
+                else:
+                    search_summary.append(f"❌ No matches found for '{search_term}'")
                 
                 # Update UI in main thread
                 self.root.after(0, lambda: self.display_global_results(all_results, search_summary, search_term))
                 
             except Exception as e:
-                error_msg = f"Global search failed: {str(e)}"
+                error_msg = f"Ultra-fast search failed: {str(e)}"
                 self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
                 
         threading.Thread(target=global_search_thread, daemon=True).start()

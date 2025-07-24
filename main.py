@@ -9,6 +9,7 @@ import json
 
 # Import our custom modules
 from database_utils import DatabaseManager, DataProcessor
+from polars_database_utils import PolarsDatabaseManager
 
 try:
     from ttkthemes import ThemedTk
@@ -38,6 +39,7 @@ class ShadowHawkBrowser:
             
         # Initialize managers
         self.db_manager = DatabaseManager()
+        self.polars_manager = PolarsDatabaseManager()  # Ultra-fast Polars manager
         self.data_processor = DataProcessor()
         
         # Application state
@@ -390,16 +392,21 @@ class ShadowHawkBrowser:
             self.load_database_file(filename)
             
     def load_database_file(self, filename: str):
-        """Load database file in background thread"""
+        """Load database file in background thread with Polars ultra-fast loading"""
         def load_thread():
             try:
-                self.root.after(0, lambda: self.update_status(f"Loading: {os.path.basename(filename)}", True))
+                self.root.after(0, lambda: self.update_status(f"🚀 Loading with Polars: {os.path.basename(filename)}", True))
                 self.root.after(0, lambda: self.show_progress(10))
                 
-                db_type = self.db_manager.detect_database_type(filename)
+                db_type = self.polars_manager.detect_database_type(filename)
                 db_name = os.path.basename(filename)
                 
-                self.root.after(0, lambda: self.show_progress(30))
+                self.root.after(0, lambda: self.show_progress(20))
+                
+                # Progress callback for real-time updates
+                def progress_callback(message, progress):
+                    self.root.after(0, lambda: self.update_status(message))
+                    self.root.after(0, lambda: self.show_progress(progress))
                 
                 if db_type == 'sqlite':
                     connection = self.db_manager.connect_sqlite(filename)
@@ -408,11 +415,13 @@ class ShadowHawkBrowser:
                     connection = self.db_manager.connect_access(filename)
                     tables = self.db_manager.get_table_list(connection, 'access')
                 elif db_type == 'csv':
-                    connection, table_name = self.db_manager.load_csv_as_database(filename)
+                    # Use ultra-fast Polars CSV loading
+                    connection, table_name = self.polars_manager.load_csv_polars(filename, progress_callback)
                     tables = [table_name]
                     db_type = 'sqlite'  # Treat as SQLite for operations
                 elif db_type == 'excel':
-                    connection, table_names = self.db_manager.load_excel_as_database(filename)
+                    # Use optimized Polars Excel loading
+                    connection, table_names = self.polars_manager.load_excel_polars(filename, progress_callback)
                     tables = table_names
                     db_type = 'sqlite'  # Treat as SQLite for operations
                 elif db_type == 'json':
@@ -422,13 +431,14 @@ class ShadowHawkBrowser:
                 else:
                     raise ValueError(f"Unsupported file type: {db_type}")
                 
-                self.root.after(0, lambda: self.show_progress(80))
+                self.root.after(0, lambda: self.show_progress(95))
                 
-                # Store database info
+                # Store database info with filename for Polars cache access
                 db_info = {
                     'connection': connection,
                     'type': db_type,
                     'path': filename,
+                    'filename': filename,  # For Polars cache lookup
                     'tables': tables
                 }
                 
@@ -660,34 +670,49 @@ class ShadowHawkBrowser:
         threading.Thread(target=search_thread, daemon=True).start()
     
     def perform_global_search(self, search_term: str):
-        """Search across all loaded databases and tables"""
+        """Ultra-fast search across all loaded databases using Polars"""
         if not self.databases:
             messagebox.showinfo("Global Search", "No databases loaded for global search.")
             return
             
         def global_search_thread():
             try:
-                self.root.after(0, lambda: self.update_status(f"Searching all databases for: {search_term}", True))
+                self.root.after(0, lambda: self.update_status(f"🚀 Ultra-fast search for: {search_term}", True))
                 
-                # Use enhanced search functionality
-                search_results = self.data_processor.search_all_databases(
-                    self.databases, search_term, self.db_manager
+                # Progress callback for real-time updates
+                def progress_callback(message, progress):
+                    self.root.after(0, lambda: self.update_status(message))
+                    self.root.after(0, lambda: self.show_progress(progress))
+                
+                # Use ultra-fast Polars search
+                search_results = self.polars_manager.ultra_parallel_global_search(
+                    self.databases, search_term, progress_callback
                 )
                 
-                # Prepare summary text
+                # Prepare enhanced summary text with performance info
                 if search_results['total_matches'] > 0:
                     summary_lines = [
-                        f"Global search found {search_results['total_matches']} total matches",
-                        f"Searched {search_results['tables_searched']} tables in {search_results['databases_searched']} databases",
+                        f"🎯 Ultra-fast search found {search_results['total_matches']} total matches",
+                        f"⚡ Searched {search_results['tables_searched']} tables in {search_results['databases_searched']} databases",
                         "",
-                        "Results by table:"
+                        "📊 Results by table:"
                     ]
                     
                     for result in search_results['summary']:
                         summary_lines.append(
-                            f"  {result['database']}.{result['table']}: {result['match_count']} matches "
+                            f"  📋 {result['database']}.{result['table']}: {result['match_count']} matches "
                             f"(out of {result['total_rows']} total rows)"
                         )
+                    
+                    # Add performance info
+                    perf_stats = self.polars_manager.get_performance_stats()
+                    summary_lines.extend([
+                        "",
+                        "🚀 Performance Info:",
+                        f"  ⚡ Polars-cached tables: {perf_stats['polars_cached_tables']}",
+                        f"  💾 Memory usage: {perf_stats['polars_memory_usage_mb']:.1f} MB",
+                        f"  🔧 Workers: {perf_stats['max_workers']}"
+                    ])
                     
                     summary_text = "\n".join(summary_lines)
                     
@@ -698,13 +723,13 @@ class ShadowHawkBrowser:
                         combined_results = pd.DataFrame()
                 else:
                     combined_results = pd.DataFrame()
-                    summary_text = f"No matches found for '{search_term}' in any loaded database."
+                    summary_text = f"❌ No matches found for '{search_term}' in any loaded database."
                 
                 # Update UI
                 self.root.after(0, lambda: self.display_global_search_results(combined_results, search_term, summary_text))
                 
             except Exception as e:
-                error_msg = f"Global search failed: {str(e)}"
+                error_msg = f"Ultra-fast search failed: {str(e)}"
                 self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
                 
         threading.Thread(target=global_search_thread, daemon=True).start()
