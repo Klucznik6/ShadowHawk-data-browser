@@ -501,7 +501,7 @@ class SimpleDatabaseBrowser:
         threading.Thread(target=global_search_thread, daemon=True).start()
     
     def display_global_results(self, all_results, search_summary, search_term):
-        """Display global search results"""
+        """Display global search results with enhanced user interface"""
         # Clear treeview
         for item in self.data_tree.get_children():
             self.data_tree.delete(item)
@@ -510,38 +510,112 @@ class SimpleDatabaseBrowser:
             # Combine all results
             combined_results = pd.concat(all_results, ignore_index=True, sort=False)
             
-            # Update treeview columns to include database and table info
+            # Reorder columns for better user experience
             columns = list(combined_results.columns)
-            self.data_tree["columns"] = columns
+            user_friendly_columns = []
+            
+            # Add metadata columns with better names
+            if '_database' in columns:
+                user_friendly_columns.append('📁 Database')
+                columns.remove('_database')
+            if '_table' in columns:
+                user_friendly_columns.append('📋 Table')
+                columns.remove('_table')
+            
+            # Add separator
+            user_friendly_columns.append('│')
+            
+            # Add data columns
+            user_friendly_columns.extend(columns)
+            
+            # Update treeview
+            self.data_tree["columns"] = user_friendly_columns
             self.data_tree["show"] = "headings"
             
             # Configure column headers
-            for col in columns:
+            for i, col in enumerate(user_friendly_columns):
                 self.data_tree.heading(col, text=col)
-                if col in ['_database', '_table']:
-                    self.data_tree.column(col, width=120, minwidth=80)
+                if col in ['📁 Database', '📋 Table']:
+                    self.data_tree.column(col, width=140, minwidth=100)
+                elif col == '│':
+                    self.data_tree.column(col, width=20, minwidth=20)
                 else:
-                    self.data_tree.column(col, width=100, minwidth=50)
+                    self.data_tree.column(col, width=120, minwidth=80)
             
-            # Insert data (limit to 2000 rows for performance in simple browser)
+            # Insert data with enhanced formatting
             display_rows = min(len(combined_results), 2000)
             for index in range(display_rows):
                 row = combined_results.iloc[index]
-                values = [str(val) if pd.notna(val) else '' for val in row]
-                self.data_tree.insert('', 'end', values=values)
+                friendly_values = []
+                
+                # Database name (clean display)
+                if '_database' in combined_results.columns:
+                    db_name = str(row['_database'])
+                    if '.' in db_name:
+                        db_name = db_name.split('.')[0]
+                    friendly_values.append(db_name)
+                
+                # Table name
+                if '_table' in combined_results.columns:
+                    friendly_values.append(str(row['_table']))
+                
+                # Separator
+                friendly_values.append('│')
+                
+                # Data values
+                for col in [c for c in combined_results.columns if c not in ['_database', '_table']]:
+                    val = row[col]
+                    str_val = str(val) if pd.notna(val) else ''
+                    # Highlight search matches
+                    if search_term.lower() in str_val.lower():
+                        friendly_values.append(f"🔍 {str_val}")
+                    else:
+                        friendly_values.append(str_val)
+                
+                # Alternating colors
+                tag = 'even' if index % 2 == 0 else 'odd'
+                self.data_tree.insert('', 'end', values=friendly_values, tags=(tag,))
             
-            # Update status
-            self.table_info_label.config(text="Global Search Results")
-            self.row_count_label.config(text=f"Found: {len(combined_results):,} matches across all databases")
+            # Configure alternating row colors
+            self.data_tree.tag_configure('even', background='#f8f9fa')
+            self.data_tree.tag_configure('odd', background='white')
             
-            # Show summary
-            summary_text = f"Global search found {len(combined_results)} total matches in {len(search_summary)} tables:\n" + "\n".join(search_summary)
-            messagebox.showinfo("Global Search Results", summary_text)
+            # Enhanced status display
+            match_count = len(combined_results)
+            db_count = combined_results['_database'].nunique() if '_database' in combined_results.columns else 0
+            table_count = len(search_summary)
+            
+            self.table_info_label.config(text=f"🔍 Global Search: '{search_term}'")
+            self.row_count_label.config(text=f"Found {match_count:,} matches in {table_count} tables from {db_count} databases")
+            
+            # Enhanced summary dialog
+            enhanced_summary = self.create_enhanced_summary(search_summary, search_term, match_count, db_count, table_count)
+            messagebox.showinfo("🔍 Global Search Results", enhanced_summary)
             
         else:
+            self.table_info_label.config(text="🔍 Global Search - No Results")
             self.row_count_label.config(text="No matches found in any database")
+            messagebox.showinfo("Search Results", f"No matches found for '{search_term}' in any loaded database.")
             
         self.update_status(f"Global search completed: {len(all_results) if all_results else 0} total results")
+    
+    def create_enhanced_summary(self, search_summary, search_term, match_count, db_count, table_count):
+        """Create an enhanced summary text"""
+        summary_lines = [
+            f"Search Term: '{search_term}'",
+            f"",
+            f"📊 SUMMARY:",
+            f"  • Total Matches: {match_count:,}",
+            f"  • Databases: {db_count}",
+            f"  • Tables with Results: {table_count}",
+            f"",
+            f"📋 DETAILED RESULTS:",
+        ]
+        
+        for result in search_summary:
+            summary_lines.append(f"  • {result}")
+        
+        return "\n".join(summary_lines)
         
     def refresh_current_table(self):
         """Refresh current table data"""

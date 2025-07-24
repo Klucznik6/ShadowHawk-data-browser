@@ -154,23 +154,32 @@ class ShadowHawkBrowser:
         ttk.Button(data_frame, text="Stats", command=self.show_data_stats, width=8).pack(side=tk.LEFT, padx=1)
         
         # Search frame
-        search_frame = ttk.LabelFrame(toolbar_frame, text="Search", padding=5)
+        search_frame = ttk.LabelFrame(toolbar_frame, text="🔍 Search", padding=5)
         search_frame.pack(side=tk.RIGHT, padx=2)
         
-        # Global search toggle
+        # Global search toggle with better styling
         self.global_search_var = tk.BooleanVar()
-        global_search_cb = ttk.Checkbutton(search_frame, text="Search All DBs", 
+        global_search_cb = ttk.Checkbutton(search_frame, text="🌐 Search All DBs", 
                                          variable=self.global_search_var,
                                          command=self.on_global_search_toggle)
         global_search_cb.pack(side=tk.LEFT, padx=2)
         
+        # Search entry with placeholder-like behavior
         self.search_var = tk.StringVar()
         self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=25)
         self.search_entry.pack(side=tk.LEFT, padx=2)
         self.search_entry.bind('<Return>', self.search_data)
         self.search_entry.bind('<KeyRelease>', self.on_search_change)
+        self.search_entry.bind('<FocusIn>', self.on_search_focus_in)
+        self.search_entry.bind('<FocusOut>', self.on_search_focus_out)
         
-        ttk.Button(search_frame, text="Clear", command=self.clear_search, width=6).pack(side=tk.LEFT, padx=1)
+        # Initialize placeholder text
+        self.search_placeholder = "Enter search term..."
+        self.search_entry.insert(0, self.search_placeholder)
+        self.search_entry.config(foreground='gray')
+        
+        ttk.Button(search_frame, text="🔍", command=self.search_data, width=3).pack(side=tk.LEFT, padx=1)
+        ttk.Button(search_frame, text="❌", command=self.clear_search, width=3).pack(side=tk.LEFT, padx=1)
         
     def create_main_layout(self):
         """Create main application layout"""
@@ -616,7 +625,7 @@ class ShadowHawkBrowser:
         
     def search_data(self, event=None):
         """Search data in current table or across all databases"""
-        search_term = self.search_var.get().strip()
+        search_term = self.get_search_term()
         if not search_term:
             if self.current_data is not None:
                 self.filtered_data = self.current_data.copy()
@@ -701,7 +710,7 @@ class ShadowHawkBrowser:
         threading.Thread(target=global_search_thread, daemon=True).start()
     
     def display_global_search_results(self, df: pd.DataFrame, search_term: str, summary: str):
-        """Display global search results"""
+        """Display global search results with enhanced user-friendly interface"""
         self.filtered_data = df
         
         # Clear and update treeview
@@ -709,36 +718,217 @@ class ShadowHawkBrowser:
             self.data_tree.delete(item)
             
         if len(df) > 0:
-            # Update treeview columns to include database and table info
+            # Reorder columns for better user experience
             columns = list(df.columns)
-            self.data_tree["columns"] = columns
+            
+            # Move metadata columns to front and make them more readable
+            user_friendly_columns = []
+            if '_database' in columns:
+                user_friendly_columns.append('Database')
+                columns.remove('_database')
+            if '_table' in columns:
+                user_friendly_columns.append('Table')
+                columns.remove('_table')
+            if '_source_row' in columns:
+                user_friendly_columns.append('Row #')
+                columns.remove('_source_row')
+            
+            # Add separator column
+            user_friendly_columns.append('---')
+            
+            # Add remaining data columns
+            user_friendly_columns.extend(columns)
+            
+            # Update treeview columns
+            self.data_tree["columns"] = user_friendly_columns
             self.data_tree["show"] = "headings"
             
-            # Configure column headers
-            for col in columns:
-                self.data_tree.heading(col, text=col)
-                if col in ['_database', '_table']:
-                    self.data_tree.column(col, width=120, minwidth=80)
+            # Configure column headers with better styling
+            for i, col in enumerate(user_friendly_columns):
+                if col == 'Database':
+                    self.data_tree.heading(col, text="🗄️ Database")
+                    self.data_tree.column(col, width=150, minwidth=100)
+                elif col == 'Table':
+                    self.data_tree.heading(col, text="📋 Table")
+                    self.data_tree.column(col, width=130, minwidth=100)
+                elif col == 'Row #':
+                    self.data_tree.heading(col, text="📍 Row #")
+                    self.data_tree.column(col, width=80, minwidth=60)
+                elif col == '---':
+                    self.data_tree.heading(col, text="│")
+                    self.data_tree.column(col, width=20, minwidth=20)
                 else:
-                    self.data_tree.column(col, width=100, minwidth=50)
+                    # Highlight columns that contain the search term
+                    if any(df[orig_col].astype(str).str.contains(search_term, case=False, na=False).any() 
+                           for orig_col in df.columns if orig_col not in ['_database', '_table', '_source_row']):
+                        self.data_tree.heading(col, text=f"🔍 {col}")
+                    else:
+                        self.data_tree.heading(col, text=col)
+                    self.data_tree.column(col, width=120, minwidth=80)
             
-            # Insert data (limit to 5000 rows for performance)
+            # Insert data with better formatting
             display_rows = min(len(df), 5000)
             for index in range(display_rows):
                 row = df.iloc[index]
-                values = [str(val) if pd.notna(val) else '' for val in row]
-                self.data_tree.insert('', 'end', values=values)
+                
+                # Create user-friendly values
+                friendly_values = []
+                
+                # Database name (remove file extension for cleaner display)
+                if '_database' in df.columns:
+                    db_name = str(row['_database'])
+                    if '.' in db_name:
+                        db_name = db_name.split('.')[0]
+                    friendly_values.append(f"📁 {db_name}")
+                
+                # Table name
+                if '_table' in df.columns:
+                    table_name = str(row['_table'])
+                    friendly_values.append(f"📋 {table_name}")
+                
+                # Row number
+                if '_source_row' in df.columns:
+                    friendly_values.append(f"#{row['_source_row']}")
+                
+                # Separator
+                friendly_values.append("│")
+                
+                # Data values with search term highlighting
+                for col in [c for c in df.columns if c not in ['_database', '_table', '_source_row']]:
+                    val = row[col]
+                    str_val = str(val) if pd.notna(val) else ''
+                    
+                    # Highlight if this value contains the search term
+                    if search_term.lower() in str_val.lower():
+                        friendly_values.append(f"🔍 {str_val}")
+                    else:
+                        friendly_values.append(str_val)
+                
+                # Insert with alternating row colors for better readability
+                tag = 'even' if index % 2 == 0 else 'odd'
+                self.data_tree.insert('', 'end', values=friendly_values, tags=(tag,))
             
-            # Update info
-            self.table_info_label.config(text="Global Search Results")
-            self.row_count_label.config(text=f"Found: {len(df):,} matches across all databases")
+            # Configure row colors
+            self.data_tree.tag_configure('even', background='#f0f8ff')
+            self.data_tree.tag_configure('odd', background='white')
             
-            # Show summary dialog
-            messagebox.showinfo("Global Search Results", summary)
+            # Update info with enhanced display
+            match_count = len(df)
+            db_count = df['_database'].nunique() if '_database' in df.columns else 0
+            table_count = len(df.groupby(['_database', '_table'])) if '_database' in df.columns and '_table' in df.columns else 0
+            
+            self.table_info_label.config(
+                text=f"🔍 Global Search Results for '{search_term}'"
+            )
+            self.row_count_label.config(
+                text=f"Found: {match_count:,} matches in {table_count} tables across {db_count} databases"
+            )
+            
+            # Create a more informative summary dialog
+            self.show_enhanced_search_summary(summary, search_term, match_count, db_count, table_count)
+            
         else:
+            self.table_info_label.config(text="🔍 Global Search - No Results")
             self.row_count_label.config(text="No matches found in any database")
+            messagebox.showinfo("Search Results", f"No matches found for '{search_term}' in any loaded database.")
             
         self.update_status(f"Global search completed: {len(df)} total results for '{search_term}'")
+    
+    def show_enhanced_search_summary(self, summary: str, search_term: str, match_count: int, db_count: int, table_count: int):
+        """Show an enhanced search summary dialog"""
+        # Create a custom dialog window
+        summary_window = tk.Toplevel(self.root)
+        summary_window.title("Global Search Summary")
+        summary_window.geometry("600x400")
+        summary_window.resizable(True, True)
+        
+        # Make it modal
+        summary_window.transient(self.root)
+        summary_window.grab_set()
+        
+        # Center the window
+        summary_window.update_idletasks()
+        x = (summary_window.winfo_screenwidth() // 2) - (600 // 2)
+        y = (summary_window.winfo_screenheight() // 2) - (400 // 2)
+        summary_window.geometry(f"600x400+{x}+{y}")
+        
+        # Header frame
+        header_frame = ttk.Frame(summary_window)
+        header_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        # Title
+        title_label = ttk.Label(header_frame, text=f"🔍 Search Results for: '{search_term}'", 
+                               font=('Segoe UI', 14, 'bold'))
+        title_label.pack()
+        
+        # Statistics frame
+        stats_frame = ttk.LabelFrame(summary_window, text="📊 Search Statistics", padding=10)
+        stats_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        # Statistics grid
+        stats_grid = ttk.Frame(stats_frame)
+        stats_grid.pack(fill=tk.X)
+        
+        ttk.Label(stats_grid, text="Total Matches:", font=('Segoe UI', 10, 'bold')).grid(row=0, column=0, sticky='w', padx=5)
+        ttk.Label(stats_grid, text=f"{match_count:,}", foreground='blue').grid(row=0, column=1, sticky='w')
+        
+        ttk.Label(stats_grid, text="Databases Searched:", font=('Segoe UI', 10, 'bold')).grid(row=1, column=0, sticky='w', padx=5)
+        ttk.Label(stats_grid, text=f"{db_count}", foreground='green').grid(row=1, column=1, sticky='w')
+        
+        ttk.Label(stats_grid, text="Tables with Matches:", font=('Segoe UI', 10, 'bold')).grid(row=2, column=0, sticky='w', padx=5)
+        ttk.Label(stats_grid, text=f"{table_count}", foreground='purple').grid(row=2, column=1, sticky='w')
+        
+        # Details frame
+        details_frame = ttk.LabelFrame(summary_window, text="📋 Detailed Results", padding=10)
+        details_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # Text area with scrollbar
+        text_frame = ttk.Frame(details_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True)
+        
+        text_area = tk.Text(text_frame, wrap=tk.WORD, font=('Consolas', 10))
+        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_area.yview)
+        text_area.configure(yscrollcommand=scrollbar.set)
+        
+        text_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Insert formatted summary
+        text_area.insert(tk.END, summary)
+        text_area.config(state=tk.DISABLED)
+        
+        # Button frame
+        button_frame = ttk.Frame(summary_window)
+        button_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Button(button_frame, text="✅ OK", command=summary_window.destroy).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(button_frame, text="📋 Copy to Clipboard", 
+                  command=lambda: self.copy_to_clipboard(summary)).pack(side=tk.RIGHT, padx=5)
+    
+    def copy_to_clipboard(self, text: str):
+        """Copy text to clipboard"""
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
+        messagebox.showinfo("Copied", "Summary copied to clipboard!")
+    
+    def on_search_focus_in(self, event=None):
+        """Handle search entry focus in - remove placeholder"""
+        if self.search_var.get() == self.search_placeholder:
+            self.search_var.set("")
+            self.search_entry.config(foreground='black')
+    
+    def on_search_focus_out(self, event=None):
+        """Handle search entry focus out - add placeholder if empty"""
+        if not self.search_var.get().strip():
+            self.search_var.set(self.search_placeholder)
+            self.search_entry.config(foreground='gray')
+    
+    def get_search_term(self):
+        """Get the actual search term (excluding placeholder)"""
+        search_text = self.search_var.get().strip()
+        if search_text == self.search_placeholder:
+            return ""
+        return search_text
         
     def on_search_change(self, event=None):
         """Handle search text change with delay"""
@@ -789,6 +979,7 @@ class ShadowHawkBrowser:
     def clear_search(self):
         """Clear search and show all data"""
         self.search_var.set("")
+        self.on_search_focus_out()  # Reset placeholder
         
         # If we have global search results, we need to reload the current table
         if (hasattr(self, 'filtered_data') and self.filtered_data is not None and 
