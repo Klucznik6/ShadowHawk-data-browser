@@ -1,5 +1,18 @@
+# ShadowHawk Database Browser Dependencies
+# Core performance libraries
+polars>=0.20.0
+pyarrow>=14.0.0
+
+# Data processing
 pandas>=2.0.0
-ttkthemes>=3.2.2
 openpyxl>=3.1.0
-pyodbc>=4.0.39
+
+# GUI and themes
+ttkthemes>=3.2.2
 Pillow>=10.0.0
+
+# Database connectivity
+pyodbc>=4.0.39
+
+# Optional: For enhanced performance
+fastparquet>=2023.10.0

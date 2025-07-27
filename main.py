@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import os
+
 import threading
 import pandas as pd
 from datetime import datetime
@@ -8,7 +9,6 @@ from typing import Dict, List, Any, Optional
 import json
 
 # Import our custom modules
-from database_utils import DatabaseManager, DataProcessor
 from polars_database_utils import PolarsDatabaseManager
 from config_manager import ConfigManager
 
@@ -40,9 +40,7 @@ class ShadowHawkBrowser:
             
         # Initialize managers
         self.config_manager = ConfigManager()  # Configuration and persistence manager
-        self.db_manager = DatabaseManager()
         self.polars_manager = PolarsDatabaseManager()  # Ultra-fast Polars manager
-        self.data_processor = DataProcessor()
         
         # Application state
         self.databases: Dict[str, Any] = {}
@@ -430,23 +428,19 @@ class ShadowHawkBrowser:
                     self.root.after(0, lambda: self.show_progress(progress))
                 
                 if db_type == 'sqlite':
-                    connection = self.db_manager.connect_sqlite(filename)
-                    tables = self.db_manager.get_table_list(connection, 'sqlite')
+                    connection, tables = self.polars_manager.load_sqlite_polars(filename, progress_callback)
                 elif db_type == 'access':
-                    connection = self.db_manager.connect_access(filename)
-                    tables = self.db_manager.get_table_list(connection, 'access')
+                    connection, tables = self.polars_manager.load_access_polars(filename, progress_callback)
                 elif db_type == 'csv':
-                    # Use ultra-fast Polars CSV loading
                     connection, table_name = self.polars_manager.load_csv_polars(filename, progress_callback)
                     tables = [table_name]
                     db_type = 'sqlite'  # Treat as SQLite for operations
                 elif db_type == 'excel':
-                    # Use optimized Polars Excel loading
                     connection, table_names = self.polars_manager.load_excel_polars(filename, progress_callback)
                     tables = table_names
                     db_type = 'sqlite'  # Treat as SQLite for operations
                 elif db_type == 'json':
-                    connection, table_name = self.db_manager.load_json_as_database(filename)
+                    connection, table_name = self.polars_manager.load_json_polars(filename, progress_callback)
                     tables = [table_name]
                     db_type = 'sqlite'  # Treat as SQLite for operations
                 else:
@@ -540,42 +534,30 @@ class ShadowHawkBrowser:
         """Load table data in background thread"""
         if not self.current_db or self.current_db not in self.databases:
             return
-            
+
         def load_thread():
             try:
                 self.root.after(0, lambda: self.update_status(f"Loading table: {table_name}", True))
                 self.root.after(0, lambda: self.show_progress(20))
-                
+
                 db_info = self.databases[self.current_db]
-                connection = db_info['connection']
-                db_type = db_info['type']
-                
-                # Get table info
-                table_info = self.db_manager.get_table_info(connection, table_name, db_type)
-                
+                filename = db_info['path']
+                # Get DataFrame from Polars cache
+                df_polars = self.polars_manager.polars_cache.get(filename, {}).get(table_name)
+                if df_polars is None:
+                    raise ValueError(f"No data found for table '{table_name}' in file '{filename}'")
+                df = df_polars.to_pandas()
+                table_info = {
+                    'row_count': len(df),
+                    'columns': list(df.columns)
+                }
                 self.root.after(0, lambda: self.show_progress(40))
-                
-                # Load data with limit for performance
-                limit_clause = f" LIMIT {self.max_display_rows}" if db_type == 'sqlite' else ""
-                query = f"SELECT * FROM [{table_name}]{limit_clause}" if db_type == 'access' else f"SELECT * FROM {table_name}{limit_clause}"
-                
-                df = self.db_manager.execute_query(connection, query)
-                
-                self.root.after(0, lambda: self.show_progress(70))
-                
-                # Optimize DataFrame for better performance
-                df = self.data_processor.optimize_dataframe(df)
-                
-                self.root.after(0, lambda: self.show_progress(90))
-                
-                # Update UI
                 self.root.after(0, lambda: self.display_table_data(df, table_info))
-                
             except Exception as e:
                 error_msg = f"Failed to load table data: {str(e)}"
                 self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
                 self.root.after(0, lambda: self.update_status("Ready"))
-                
+
         threading.Thread(target=load_thread, daemon=True).start()
         
     def display_table_data(self, df: pd.DataFrame, table_info: Dict[str, Any]):
@@ -633,25 +615,37 @@ class ShadowHawkBrowser:
             
         # Add column statistics
         for col in df.columns:
-            stats = self.data_processor.get_column_stats(df, col)
+            # Calculate statistics directly using pandas
+            col_data = df[col]
+            null_count = col_data.isnull().sum()
+            unique_count = col_data.nunique()
+            data_type = str(col_data.dtype)
             
             # Format statistics string
             stats_str = ""
-            if 'min' in stats and 'max' in stats:
-                if pd.api.types.is_numeric_dtype(df[col]):
-                    stats_str = f"Min: {stats['min']:.2f}, Max: {stats['max']:.2f}"
-                    if 'mean' in stats:
-                        stats_str += f", Mean: {stats['mean']:.2f}"
+            try:
+                if pd.api.types.is_numeric_dtype(col_data):
+                    # Numeric statistics
+                    col_min = col_data.min()
+                    col_max = col_data.max()
+                    col_mean = col_data.mean()
+                    stats_str = f"Min: {col_min:.2f}, Max: {col_max:.2f}, Mean: {col_mean:.2f}"
                 else:
-                    stats_str = f"Range: {stats['min']} to {stats['max']}"
-            elif 'top_values' in stats:
-                top_val = list(stats['top_values'].keys())[0] if stats['top_values'] else 'N/A'
-                stats_str = f"Most common: {top_val}"
+                    # Non-numeric statistics
+                    value_counts = col_data.value_counts()
+                    if not value_counts.empty:
+                        top_value = value_counts.index[0]
+                        top_count = value_counts.iloc[0]
+                        stats_str = f"Most common: {top_value} ({top_count})"
+                    else:
+                        stats_str = "No data"
+            except Exception:
+                stats_str = "Unable to calculate"
                 
             self.column_tree.insert('', 'end', text=col, values=(
-                stats['type'],
-                stats['null_count'],
-                stats['unique_count'],
+                data_type,
+                null_count,
+                unique_count,
                 stats_str
             ))
             
@@ -684,8 +678,8 @@ class ShadowHawkBrowser:
             try:
                 self.root.after(0, lambda: self.update_status(f"Searching current table for: {search_term}", True))
                 
-                # Perform search
-                filtered_df = self.data_processor.search_dataframe(self.current_data, search_term)
+                # Perform search using pandas
+                filtered_df = self.search_dataframe(self.current_data, search_term)
                 
                 # Update UI
                 self.root.after(0, lambda: self.display_search_results(filtered_df, search_term))
@@ -695,6 +689,29 @@ class ShadowHawkBrowser:
                 self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
                 
         threading.Thread(target=search_thread, daemon=True).start()
+    
+    def search_dataframe(self, df: pd.DataFrame, search_term: str) -> pd.DataFrame:
+        """Search dataframe for the given term across all columns"""
+        if df is None or df.empty:
+            return pd.DataFrame()
+        
+        # Convert search term to string and make case-insensitive
+        search_term = str(search_term).lower()
+        
+        # Create a mask for rows that contain the search term
+        mask = pd.Series([False] * len(df))
+        
+        # Search in each column
+        for col in df.columns:
+            try:
+                # Convert column to string and search case-insensitively
+                col_str = df[col].astype(str).str.lower()
+                mask = mask | col_str.str.contains(search_term, na=False, regex=False)
+            except Exception:
+                # If any error occurs with a column, skip it
+                continue
+                
+        return df[mask]
     
     def perform_global_search(self, search_term: str):
         """Ultra-fast search across all loaded databases using Polars"""
@@ -1286,18 +1303,31 @@ class ShadowHawkBrowser:
         
         stats_text += "Column Information\n" + "-"*30 + "\n"
         for col in self.current_data.columns:
-            col_stats = self.data_processor.get_column_stats(self.current_data, col)
-            stats_text += f"\n{col}:\n"
-            stats_text += f"  Type: {col_stats['type']}\n"
-            stats_text += f"  Null values: {col_stats['null_count']}\n"
-            stats_text += f"  Unique values: {col_stats['unique_count']}\n"
+            # Generate column statistics directly
+            col_data = self.current_data[col]
+            null_count = col_data.isnull().sum()
+            unique_count = col_data.nunique()
+            data_type = str(col_data.dtype)
             
-            if 'min' in col_stats:
-                stats_text += f"  Min: {col_stats['min']}\n"
-                stats_text += f"  Max: {col_stats['max']}\n"
-                if 'mean' in col_stats:
-                    stats_text += f"  Mean: {col_stats['mean']:.2f}\n"
-                    stats_text += f"  Std: {col_stats['std']:.2f}\n"
+            stats_text += f"\n{col}:\n"
+            stats_text += f"  Type: {data_type}\n"
+            stats_text += f"  Null values: {null_count}\n"
+            stats_text += f"  Unique values: {unique_count}\n"
+            
+            try:
+                if pd.api.types.is_numeric_dtype(col_data):
+                    col_min = col_data.min()
+                    col_max = col_data.max()
+                    col_mean = col_data.mean()
+                    stats_text += f"  Min: {col_min}\n"
+                    stats_text += f"  Max: {col_max}\n"
+                    stats_text += f"  Mean: {col_mean:.2f}\n"
+                else:
+                    value_counts = col_data.value_counts()
+                    if not value_counts.empty:
+                        stats_text += f"  Most common: {value_counts.index[0]} ({value_counts.iloc[0]})\n"
+            except Exception:
+                stats_text += "  Statistics: Unable to calculate\n"
                     
         text_widget.insert('1.0', stats_text)
         text_widget.config(state=tk.DISABLED)
