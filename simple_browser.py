@@ -15,6 +15,7 @@ import json
 
 # Import Polars for ultra-fast performance
 from polars_database_utils import PolarsDatabaseManager
+from config_manager import ConfigManager
 
 try:
     from ttkthemes import ThemedTk
@@ -42,11 +43,16 @@ class SimpleDatabaseBrowser:
         self.current_table = None
         self.current_data = None
         
-        # Initialize Polars manager for ultra-fast operations
+        # Initialize managers
+        self.config_manager = ConfigManager()  # Configuration and persistence
         self.polars_manager = PolarsDatabaseManager()
         
         # Setup UI
         self.setup_ui()
+        
+        # Restore saved databases and setup close handler
+        self.restore_saved_databases()
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
     def setup_ui(self):
         """Setup the main UI components"""
@@ -68,9 +74,24 @@ class SimpleDatabaseBrowser:
         file_menu.add_command(label="Import Excel", command=self.import_excel)
         file_menu.add_command(label="Import JSON", command=self.import_json)
         file_menu.add_separator()
+        
+        # Recent files
+        self.recent_menu = tk.Menu(file_menu, tearoff=0)
+        file_menu.add_cascade(label="📁 Recent Files", menu=self.recent_menu)
+        self.update_recent_files_menu()
+        
+        file_menu.add_separator()
+        file_menu.add_command(label="❌ Remove All Databases", command=self.remove_all_databases)
+        file_menu.add_separator()
         file_menu.add_command(label="Export Current Table", command=self.export_table)
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.root.quit)
+        file_menu.add_command(label="💾 Save Database State", command=self.save_all_database_states)
+        file_menu.add_command(label="🔄 Restore Databases", command=self.restore_saved_databases)
+        file_menu.add_separator()
+        file_menu.add_command(label="❌ Remove Selected Database", command=self.remove_selected_database)
+        file_menu.add_command(label="🗑️ Remove All Databases", command=self.remove_all_databases)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.on_closing)
         
     def create_toolbar(self):
         """Create toolbar with common actions"""
@@ -117,6 +138,7 @@ class SimpleDatabaseBrowser:
         self.db_listbox = tk.Listbox(left_frame, height=6)
         self.db_listbox.pack(fill=tk.X, pady=(0, 5))
         self.db_listbox.bind('<<ListboxSelect>>', self.on_database_select)
+        self.db_listbox.bind('<Button-3>', self.show_database_context_menu)  # Right-click context menu
         
         # Table list
         ttk.Label(left_frame, text="Tables").pack(anchor=tk.W)
@@ -295,6 +317,12 @@ class SimpleDatabaseBrowser:
         """Handle database loaded event"""
         self.connections[db_name] = db_info
         
+        # Save database state for persistence
+        self.config_manager.save_database_state(db_name, db_info)
+        
+        # Update recent files menu
+        self.update_recent_files_menu()
+        
         # Add to database list
         if db_name not in self.db_listbox.get(0, tk.END):
             self.db_listbox.insert(tk.END, db_name)
@@ -308,7 +336,7 @@ class SimpleDatabaseBrowser:
                 break
                 
         self.on_database_select(None)
-        self.update_status(f"Loaded: {db_name} ({len(db_info['tables'])} tables)")
+        self.update_status(f"💾 Loaded & Saved: {db_name} ({len(db_info['tables'])} tables)")
         
     def on_database_select(self, event):
         """Handle database selection"""
@@ -688,6 +716,262 @@ class SimpleDatabaseBrowser:
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Export failed: {str(e)}"))
                 
         threading.Thread(target=export, daemon=True).start()
+    
+    def save_all_database_states(self):
+        """Save all current database states"""
+        try:
+            count = 0
+            for db_name, db_info in self.connections.items():
+                self.config_manager.save_database_state(db_name, db_info)
+                count += 1
+            
+            messagebox.showinfo("Database State Saved", 
+                              f"✅ Saved state for {count} databases.\n"
+                              f"They will be restored on next startup.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save database states: {e}")
+    
+    def restore_saved_databases(self):
+        """Restore previously saved databases"""
+        if not self.config_manager.should_auto_reconnect():
+            return
+            
+        saved_databases = self.config_manager.get_saved_databases()
+        
+        if not saved_databases:
+            return
+            
+        def restore_thread():
+            restored_count = 0
+            for db_name, db_state in saved_databases.items():
+                try:
+                    filepath = db_state['path']
+                    if os.path.exists(filepath):
+                        self.root.after(0, lambda: self.update_status(f"🔄 Restoring: {db_name}..."))
+                        self.load_database_file(filepath)
+                        restored_count += 1
+                except Exception as e:
+                    print(f"Failed to restore database {db_name}: {e}")
+                    self.config_manager.remove_database_state(db_name)
+            
+            if restored_count > 0:
+                self.root.after(0, lambda: self.update_status(f"✅ Restored {restored_count} databases"))
+            else:
+                self.root.after(0, lambda: self.update_status("Ready"))
+        
+        threading.Thread(target=restore_thread, daemon=True).start()
+    
+    def update_recent_files_menu(self):
+        """Update the recent files menu"""
+        self.recent_menu.delete(0, tk.END)
+        
+        recent_files = self.config_manager.get_recent_files()
+        
+        if not recent_files:
+            self.recent_menu.add_command(label="(No recent files)", state="disabled")
+            return
+        
+        for i, filepath in enumerate(recent_files[:10]):
+            if os.path.exists(filepath):
+                filename = os.path.basename(filepath)
+                if len(filename) > 50:
+                    filename = filename[:47] + "..."
+                
+                self.recent_menu.add_command(
+                    label=f"{i+1}. {filename}",
+                    command=lambda path=filepath: self.load_database_file(path)
+                )
+    
+    def show_database_context_menu(self, event):
+        """Show context menu for database listbox on right-click"""
+        # Select the item under cursor
+        index = self.db_listbox.nearest(event.y)
+        if index >= 0:
+            self.db_listbox.selection_clear(0, tk.END)
+            self.db_listbox.selection_set(index)
+            self.db_listbox.activate(index)
+            
+            # Create context menu
+            context_menu = tk.Menu(self.root, tearoff=0)
+            context_menu.add_command(label="❌ Remove Database", command=self.remove_selected_database)
+            context_menu.add_separator()
+            context_menu.add_command(label="🔄 Reload Database", command=self.reload_selected_database)
+            
+            # Show context menu
+            try:
+                context_menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                context_menu.grab_release()
+    
+    def remove_selected_database(self):
+        """Remove the currently selected database"""
+        selection = self.db_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a database to remove.")
+            return
+        
+        db_name = self.db_listbox.get(selection[0])
+        
+        # Confirm deletion
+        result = messagebox.askyesno(
+            "Remove Database", 
+            f"Remove database '{db_name}' from the application?\n\n"
+            f"⚠️ This will:\n"
+            f"• Close the database connection\n"
+            f"• Remove it from the database list\n"
+            f"• Remove it from saved history\n"
+            f"• Clear any displayed data\n\n"
+            f"The original file will NOT be deleted.",
+            icon='warning'
+        )
+        
+        if not result:
+            return
+        
+        try:
+            # Close database connection if exists
+            if db_name in self.connections:
+                db_info = self.connections[db_name]
+                if 'connection' in db_info and db_info['connection']:
+                    try:
+                        db_info['connection'].close()
+                    except Exception as e:
+                        print(f"Error closing connection for {db_name}: {e}")
+                
+                # Remove from connections dict
+                del self.connections[db_name]
+            
+            # Remove from config/saved state
+            self.config_manager.remove_database_state(db_name)
+            
+            # Remove from listbox
+            self.db_listbox.delete(selection[0])
+            
+            # Clear UI if this was the current database
+            if self.current_db == db_name:
+                self.current_db = None
+                self.current_table = None
+                self.current_data = None
+                
+                # Clear table list
+                self.table_listbox.delete(0, tk.END)
+                
+                # Clear data display
+                for item in self.data_tree.get_children():
+                    self.data_tree.delete(item)
+            
+            # Update recent files menu
+            self.update_recent_files_menu()
+            
+            self.update_status(f"✅ Removed database: {db_name}")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to remove database: {str(e)}")
+    
+    def reload_selected_database(self):
+        """Reload the currently selected database"""
+        selection = self.db_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a database to reload.")
+            return
+        
+        db_name = self.db_listbox.get(selection[0])
+        
+        if db_name in self.connections:
+            db_info = self.connections[db_name]
+            if 'path' in db_info and os.path.exists(db_info['path']):
+                # Remove current database first
+                try:
+                    if 'connection' in db_info and db_info['connection']:
+                        db_info['connection'].close()
+                except:
+                    pass
+                
+                # Remove from UI
+                self.db_listbox.delete(selection[0])
+                del self.connections[db_name]
+                
+                # Reload the database
+                self.load_database_file(db_info['path'])
+                self.update_status(f"🔄 Reloading: {db_name}")
+            else:
+                messagebox.showerror("Error", f"Database file not found: {db_info.get('path', 'Unknown path')}")
+        else:
+            messagebox.showwarning("Error", f"Database '{db_name}' not found in loaded databases.")
+    
+    def remove_all_databases(self):
+        """Remove all loaded databases (with confirmation)"""
+        if not self.connections:
+            messagebox.showinfo("No Databases", "No databases are currently loaded.")
+            return
+        
+        result = messagebox.askyesno(
+            "Remove All Databases",
+            f"⚠️ Remove ALL {len(self.connections)} loaded databases?\n\n"
+            f"This will:\n"
+            f"• Close all database connections\n"
+            f"• Clear the database list\n"
+            f"• Clear all displayed data\n"
+            f"• Remove from saved history\n\n"
+            f"Original files will NOT be deleted.",
+            icon='warning'
+        )
+        
+        if not result:
+            return
+        
+        try:
+            # Close all connections
+            for db_name, db_info in self.connections.items():
+                if 'connection' in db_info and db_info['connection']:
+                    try:
+                        db_info['connection'].close()
+                    except:
+                        pass
+                
+                # Remove from saved state
+                self.config_manager.remove_database_state(db_name)
+            
+            # Clear all data
+            self.connections.clear()
+            self.db_listbox.delete(0, tk.END)
+            self.table_listbox.delete(0, tk.END)
+            
+            # Clear data display
+            for item in self.data_tree.get_children():
+                self.data_tree.delete(item)
+            
+            # Reset current selections
+            self.current_db = None
+            self.current_table = None
+            self.current_data = None
+            
+            # Update recent files menu
+            self.update_recent_files_menu()
+            
+            self.update_status("✅ Removed all databases")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to remove all databases: {str(e)}")
+    
+    def on_closing(self):
+        """Handle application closing - save state"""
+        try:
+            # Save all database states
+            for db_name, db_info in self.connections.items():
+                self.config_manager.save_database_state(db_name, db_info)
+            
+            # Close connections
+            for db_info in self.connections.values():
+                if 'connection' in db_info:
+                    try:
+                        db_info['connection'].close()
+                    except:
+                        pass
+        except Exception as e:
+            print(f"Error during shutdown: {e}")
+        
+        self.root.destroy()
         
     def run(self):
         """Start the application"""

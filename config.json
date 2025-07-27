@@ -20,6 +20,16 @@
     "lazy_loading": true,
     "memory_threshold_mb": 500
   },
-  "recent_files": [],
-  "database_connections": {}
+  "persistence_settings": {
+    "save_loaded_databases": true,
+    "auto_reconnect_on_startup": true,
+    "max_recent_databases": 10,
+    "remember_database_state": true
+  },
+  "recent_files": [
+    "C:/Users/kulik/Downloads/username-password-recovery-code.csv",
+    "C:/Users/kulik/Downloads/username.csv"
+  ],
+  "database_connections": {},
+  "loaded_databases": {}
 }
