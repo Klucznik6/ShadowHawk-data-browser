@@ -1,154 +1,146 @@
-# 🦅 ShadowHawk Database Browser v2.0
+# 🦅 ShadowHawk Database Browser v3.0
 
-A powerful, ultra-fast database browser and data analysis tool built with Python. Features lightning-fast Polars integration for 46x faster data processing than traditional pandas-based solutions.
+A powerful, modern database browser and data analysis tool built with Python. Features ultra-fast Polars integration, CustomTkinter modern UI, and comprehensive database management capabilities.
 
 ![Python](https://img.shields.io/badge/Python-3.13%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
+![Version](https://img.shields.io/badge/Version-3.0-brightgreen)
 
-## ✨ Features
+## ✨ Key Features
 
 ### 🚀 **Ultra-Fast Performance**
-- **46x faster** data processing with Polars integration
+- **5-30x faster** data processing with Polars integration
 - Multi-threaded operations for responsive UI
-- Optimized memory management for large datasets
-- Chunked data loading for massive files
+- Smart caching system for instant data access
+- Memory-efficient processing of large datasets
 
-### 🔍 **Advanced Search Capabilities**
-- **Global search** across all loaded databases and tables
-- Real-time search with instant results
-- Search result highlighting and navigation
-- Table and column-specific filtering
+### 🎨 **Modern User Interface**
+- **CustomTkinter** modern GUI framework
+- Professional dark/light theme support
+- Intuitive tabbed interface design
+- Responsive layout with proper widget isolation
 
-### 💾 **Multi-Format Support**
+### 🔍 **Advanced Search & Analysis**
+- **Global search** across all loaded databases
+- Ultra-fast parallel search with real-time results
+- Interactive search results with click-to-navigate
+- Comprehensive data statistics and column analysis
+
+### 💾 **Comprehensive File Support**
 - **SQLite** databases (.db, .sqlite, .sqlite3)
-- **CSV** files with auto-detection
-- **Excel** files (.xlsx, .xls)
-- **JSON** data files
+- **CSV** files with intelligent auto-detection
+- **Excel** files (.xlsx, .xls) with multiple sheets
+- **JSON** data files with nested structure support
+- **Access** databases (.mdb, .accdb) via ODBC
 
-### 🎯 **Database Management**
-- Load multiple databases simultaneously
-- **Persistent database connections** (saved between sessions)
-- Right-click context menus for database operations
-- Remove unwanted databases with confirmation dialogs
-- Auto-reconnect to saved databases on startup
+### 🗃️ **Smart Database Management**
+- **Persistent sessions** - remembers all databases between app restarts
+- **Recent files menu** with quick access to previously opened files
+- **Database deletion** with UI controls and confirmation dialogs
+- **Automatic restoration** of last working session
+- **Configuration persistence** with user preferences
 
-### � **Data Analysis**
-- Interactive data viewing with sortable columns
-- Detailed column statistics and information
-- Data export capabilities (CSV, Excel, JSON)
-- Row count and filtering information
+### 📊 **Professional Data Tools**
+- **SQL Query Interface** - execute custom queries
+- **Export capabilities** - CSV, Excel, filtered data
+- **Column statistics** - detailed analysis with min/max/mean/median
+- **Font size controls** - increase/decrease for better readability
+- **Keyboard shortcuts** - full shortcut support for power users
 
-### 🎨 **User-Friendly Interface**
-- Modern tkinter interface with ttkthemes
-- Tabbed data and column info views
-- Status bar with operation feedback
-- Emoji-enhanced UI elements
-- Resizable and responsive layout
-- **Optimized data loading** with smart caching
-- **Memory-efficient** DataFrame processing
-- **Fast search and filtering** across large datasets
+## � Quick Start
 
-### 📊 **Supported File Formats**
-- **SQLite** (.db, .sqlite, .sqlite3)
-- **Microsoft Access** (.mdb, .accdb) - with pyodbc
-- **CSV files** (.csv)
-- **Excel files** (.xlsx, .xls) 
-- **JSON files** (.json)
+### 1. Prerequisites
+- **Python 3.8+** (3.13+ recommended)
+- **Windows/macOS/Linux** support
 
-### 🔍 **Advanced Data Browsing**
-- **Real-time search** with instant filtering
-- **Column statistics** and data analysis
-- **Sortable columns** with visual indicators
-- **Data export** to multiple formats
-- **Column type detection** and optimization
-
-### 🎨 **Modern GUI**
-- **Clean, intuitive interface** with theming support
-- **Tabbed interface** for data and column views
-- **Context menus** for quick actions
-- **Keyboard shortcuts** for power users
-- **Progress indicators** for long operations
-
-## Quick Start
-
-### 1. Install Dependencies
-Run the installation script (Windows):
+### 2. Installation
 ```bash
-install.bat
+# Clone the repository
+git clone https://github.com/Klucznik6/ShadowHawk-data-browser.git
+cd ShadowHawk-data-browser
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-Or manually install with pip:
+### 3. Run the Application
 ```bash
-pip install pandas ttkthemes openpyxl pyodbc Pillow
-```
-
-### 2. Run the Application
-```bash
-# Windows
-run.bat
-
-# Or directly with Python
+# Start ShadowHawk Database Browser
 python main.py
 ```
 
-## Usage
+## 💡 Usage Guide
 
-### Opening Databases
-1. Click **"Open DB"** or press `Ctrl+O`
-2. Select your database file
-3. Browse tables in the left panel
-4. Double-click a table to load data
+### 📂 **Opening Databases**
+1. **File Menu** → Open Database (`Ctrl+O`)
+2. **Import Menu** → CSV/Excel/JSON files
+3. **Recent Files** → Quick access to previous databases
+4. **Drag & Drop** support (where available)
 
-### Importing Data Files
-- **CSV**: File → Import → CSV File
-- **Excel**: File → Import → Excel File  
-- **JSON**: File → Import → JSON File
+### 🔍 **Searching Data**
+- **Local Search**: Search within current table
+- **Global Search**: Click "🌐 Search All DBs" for cross-database search
+- **Real-time Results**: Search as you type
+- **Navigate Results**: Double-click search results to jump to data
 
-### Searching Data
-1. Type in the search box (top-right)
-2. Results filter automatically as you type
-3. Press `Escape` to clear search
+### 📊 **Data Analysis**
+- **Column Statistics**: View → Column Statistics
+- **Data Statistics**: Tools → Data Statistics  
+- **SQL Queries**: Tools → SQL Query for custom analysis
+- **Export Options**: File → Export (CSV/Excel/Filtered)
 
-### Exporting Data
-- **Current table**: File → Export → Current Table
-- **Filtered data**: File → Export → Filtered Data
-- Supports CSV, Excel, and JSON formats
+### ⚙️ **Database Management**
+- **Persistent Sessions**: All databases automatically saved
+- **Remove Databases**: Click red ❌ button next to database names
+- **Recent Files**: File → Recent Files menu
+- **State Management**: File → Save/Restore Database State
 
-## Keyboard Shortcuts
+## ⌨️ Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+O` | Open database |
-| `Ctrl+F` | Focus search |
-| `F5` | Refresh current table |
-| `Ctrl+C` | Copy selected rows |
-| `Escape` | Clear search |
+| `Ctrl+O` | Open Database |
+| `Ctrl+F` | Find/Search |
+| `Ctrl+C` | Copy Selected |
+| `F5` | Refresh Table |
+| `Esc` | Clear Search |
+| `Ctrl++` | Increase Font |
+| `Ctrl+-` | Decrease Font |
 
-## Architecture
+## 🏗️ Architecture
 
-### Core Components
+### **Core Components**
 
-**`main.py`** - Main application with enhanced GUI
-- Modern tkinter interface with ttkthemes
-- Multi-threaded operations for performance
-- Advanced search and filtering
-- Data visualization and statistics
+#### **`main.py`** - Enhanced Database Browser
+- **CustomTkinter modern UI** with professional styling
+- **Multi-threaded operations** for responsive experience
+- **Comprehensive menu system** with all features
+- **Enhanced search capabilities** with global search
 
-**`database_utils.py`** - Database management utilities
-- Multi-format database support
-- Optimized data processing with pandas
-- Memory-efficient operations
-- Fast search algorithms
+#### **`polars_database_utils.py`** - Ultra-Fast Data Engine
+- **Polars integration** for 5-30x performance boost
+- **Smart caching system** with automatic optimization
+- **Multi-format support** (SQLite, CSV, Excel, JSON, Access)
+- **Parallel processing** for large datasets
 
-**`database_browser.py`** - Simple version for basic usage
-- Lightweight implementation
-- Core functionality only
-- Good for learning/customization
+#### **`app_config.py`** - Configuration Management
+- **Persistent settings** stored in user directory
+- **Database state preservation** between sessions
+- **Window geometry restoration** 
+- **Recent files management**
 
-### Performance Optimizations
+#### **`config_manager.py`** - Legacy Configuration Support
+- **Backward compatibility** with older versions
+- **Migration utilities** for configuration updates
 
-1. **Lazy Loading**: Only load visible data rows
+### **Performance Optimizations**
+
+1. **Polars Integration**: Ultra-fast DataFrame operations
+2. **Smart Caching**: Automatic data caching for instant access
+3. **Lazy Loading**: Load data on-demand for large datasets
+4. **Multi-threading**: Background operations don't block UI
+5. **Memory Optimization**: Efficient memory usage patterns
 2. **DataFrame Optimization**: Automatic data type optimization
 3. **Threaded Operations**: Non-blocking UI during data operations
 4. **Smart Caching**: Cache frequently accessed data
@@ -175,78 +167,126 @@ python main.py
 
 ## File Structure
 
+## 📁 Project Structure
+
 ```
 ShadowHawk-data-browser/
-├── main.py              # Enhanced main application
-├── database_browser.py  # Simple version
-├── database_utils.py    # Database utilities
-├── requirements.txt     # Python dependencies
-├── install.bat         # Windows installer
-├── run.bat             # Windows launcher
-└── README.md           # This file
+├── main.py                 # Main application (modern GUI)
+├── polars_database_utils.py # Ultra-fast data processing engine
+├── app_config.py           # Modern configuration management
+├── config_manager.py       # Legacy configuration support
+├── simple_browser.py       # Lightweight database browser
+├── requirements.txt        # Python dependencies
+├── sample_data/           # Sample datasets for testing
+├── docs/                  # Documentation
+├── tests/                 # Unit tests
+├── scripts/               # Utility scripts
+└── README.md              # This file
 ```
 
-## Advanced Features
+## 🔧 Advanced Features
 
-### Data Statistics
-- **Column analysis**: Data types, null counts, unique values
-- **Numeric statistics**: Min, max, mean, standard deviation
-- **Memory usage**: Optimized data type recommendations
+### **💾 Persistent Sessions**
+- **Auto-save**: All opened databases remembered between sessions
+- **Window state**: Size and position restored on startup  
+- **Last selection**: Returns to your last viewed table
+- **Configuration**: Settings stored in `~/.shadowhawk/config.json`
 
-### Search Capabilities
-- **Multi-column search**: Search across all columns simultaneously
-- **Data type aware**: Handles text, numeric, and date searches
-- **Real-time filtering**: Results update as you type
-- **Case-insensitive**: Flexible text matching
+### **🔍 Global Search Engine**
+- **Cross-database**: Search across all loaded databases simultaneously
+- **Multi-threaded**: Parallel search for maximum speed
+- **Smart results**: Click results to navigate directly to data
+- **Performance stats**: Real-time search performance information
 
-### Export Options
-- **Format preservation**: Maintain data types during export
-- **Filtered exports**: Export only visible/filtered data
-- **Large dataset handling**: Efficient export of big files
+### **📊 Data Analysis Tools**
+- **SQL Query Interface**: Execute custom SQL queries
+- **Column Statistics**: Detailed statistical analysis
+- **Data Export**: Multiple format support with filtering
+- **Memory Optimization**: Efficient handling of large datasets
 
-## Troubleshooting
+### **🎨 Modern UI Features**
+- **CustomTkinter**: Professional modern interface
+- **Theme Support**: Dark/light themes with system integration
+- **Font Controls**: Adjustable font sizes for accessibility
+- **Responsive Layout**: Adapts to different screen sizes
 
-### Common Issues
+## 🚨 Troubleshooting
 
-**"Import pandas could not be resolved"**
-- Run `install.bat` or `pip install pandas`
+### **Installation Issues**
+```bash
+# If CustomTkinter installation fails
+pip install --upgrade pip
+pip install customtkinter
 
-**"Failed to connect to Access database"**
-- Install Microsoft Access Database Engine
-- Ensure pyodbc is installed: `pip install pyodbc`
+# If Polars installation fails  
+pip install --upgrade polars
+```
 
-**"Application crashes on large files"**
-- Increase max_display_rows in settings
-- Use filtering to reduce data size
-- Close other applications to free memory
+### **Runtime Issues**
+- **Large files slow to load**: Enable Polars optimization in settings
+- **Search results not showing**: Check debug console for error messages
+- **Database won't open**: Verify file permissions and format support
+- **UI appears broken**: Try updating CustomTkinter to latest version
 
-### Performance Tips
+### **Performance Optimization**
+1. **Enable Polars caching** for frequently accessed tables
+2. **Limit display rows** in settings for very large datasets  
+3. **Close unused databases** to free memory
+4. **Use SSD storage** for better file I/O performance
 
-1. **For large CSV files**: Use chunked loading
-2. **For slow searches**: Create database indexes
-3. **For memory issues**: Enable data type optimization
-4. **For UI freezing**: Ensure threading is enabled
+## 🤝 Contributing
 
-## Contributing
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-This is a single-file application designed for simplicity and performance. To contribute:
+### **Development Setup**
+```bash
+# Clone the repository
+git clone https://github.com/Klucznik6/ShadowHawk-data-browser.git
+cd ShadowHawk-data-browser
 
-1. Fork the repository
-2. Create feature branches
-3. Test with various database formats
-4. Submit pull requests
+# Install development dependencies
+pip install -r requirements.txt
+pip install pytest black flake8
 
-## License
+# Run tests
+pytest tests/
 
-MIT License - See LICENSE file for details.
+# Format code
+black *.py
+```
 
-## Support
+### **Reporting Issues**
+- Use GitHub Issues for bug reports
+- Include Python version and OS information
+- Attach sample data files if relevant
+- Describe steps to reproduce the issue
 
-For issues and questions:
-- Check the troubleshooting section
-- Review Python and dependency documentation
-- File issues on the project repository
+## 📈 Version History
+
+- **v3.0** - Modern CustomTkinter UI, database persistence, global search
+- **v2.0** - Polars integration, enhanced performance, multi-format support  
+- **v1.0** - Initial release with basic database browsing
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Polars** team for the ultra-fast DataFrame library
+- **CustomTkinter** for the modern GUI framework
+- **Python** community for excellent data processing libraries
+- **Contributors** who helped improve this project
+
+## 📞 Support
+
+- **Documentation**: Check the `/docs` folder for detailed guides
+- **Issues**: Report bugs via GitHub Issues
+- **Discussions**: Join project discussions for feature requests
+- **Email**: Contact maintainers for security-related issues
 
 ---
 
-**Built with ❤️ using Python, tkinter, and pandas**
+**🦅 ShadowHawk Database Browser** - *Fast, Modern, Reliable*
+
+Built with ❤️ using Python, CustomTkinter, and Polars

@@ -1,18 +1,31 @@
-# ShadowHawk Database Browser Dependencies
-# Core performance libraries
-polars>=0.20.0
-pyarrow>=14.0.0
+# ShadowHawk Database Browser - Requirements
+# Core dependencies for the modern database browser
 
-# Data processing
-pandas>=2.0.0
-openpyxl>=3.1.0
+# Data processing and performance
+polars>=0.20.0               # Ultra-fast DataFrame operations
+pandas>=2.0.0                # Data manipulation and analysis
+pyarrow>=14.0.0              # Arrow columnar format support
 
-# GUI and themes
-ttkthemes>=3.2.2
-Pillow>=10.0.0
+# File format support
+openpyxl>=3.1.0              # Excel file read/write support
+xlrd>=2.0.0                  # Legacy Excel file support
 
-# Database connectivity
-pyodbc>=4.0.39
+# Modern GUI framework
+customtkinter>=5.2.0         # Modern tkinter components and themes
 
-# Optional: For enhanced performance
-fastparquet>=2023.10.0
+# Optional GUI enhancements
+ttkthemes>=3.2.2             # Additional tkinter themes
+Pillow>=10.0.0               # Image processing for GUI
+
+# Database connectivity (optional)
+pyodbc>=4.0.39               # ODBC database connections
+
+# Performance optimizations (optional)
+fastparquet>=2023.10.0       # Fast Parquet file operations
+
+# Development dependencies (optional)
+pytest>=7.0.0                # Testing framework
+black>=23.0.0                # Code formatting
+flake8>=6.0.0                # Code linting
+
+# Note: tkinter and sqlite3 are included with Python standard library
