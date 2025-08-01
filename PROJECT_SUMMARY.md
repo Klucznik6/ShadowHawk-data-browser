@@ -1,4 +1,4 @@
-# 🦅 ShadowHawk Database Browser v3.0 - Project Summary
+# ShadowHawk Database Browser v3.0 - Project Summary
 
 ## 📋 Final Project Status
 
