@@ -32,11 +32,17 @@ class ShadowHawkBrowser:
         self.root.geometry("1400x900")
         self.root.minsize(1000, 700)
         
-        # Set application icon if available
+        # Set window class name for better Windows taskbar recognition
         try:
-            self.root.iconbitmap("icon.ico")
+            self.root.wm_class("ShadowHawk", "ShadowHawk Database Browser")
         except:
             pass
+        
+        # Set application icon with multiple methods for maximum compatibility
+        self._set_application_icon()
+        
+        # Try Windows-specific taskbar integration
+        self._setup_windows_taskbar()
             
         # Initialize managers
         self.config_manager = ConfigManager()  # Configuration and persistence manager
@@ -1776,6 +1782,102 @@ Built with Python, tkinter, and pandas.
         self.config_manager.config['recent_files'] = []
         self.config_manager.save_config()
         self.update_recent_files_menu()
+    
+    def _set_application_icon(self):
+        """Set application icon with multiple fallback methods"""
+        icon_set = False
+        
+        # Method 1: Try ICO file first (best for Windows)
+        try:
+            if os.path.exists("icon.ico"):
+                self.root.iconbitmap("icon.ico")
+                icon_set = True
+        except Exception as e:
+            pass
+        
+        # Method 2: Try PNG via PhotoImage (works for window, not always taskbar)
+        if not icon_set:
+            try:
+                from PIL import Image, ImageTk
+                icon_image = Image.open("assets/icon.png")
+                
+                # Create multiple sizes
+                icon_16 = icon_image.resize((16, 16), Image.Resampling.LANCZOS)
+                icon_32 = icon_image.resize((32, 32), Image.Resampling.LANCZOS)
+                icon_48 = icon_image.resize((48, 48), Image.Resampling.LANCZOS)
+                
+                # Convert to PhotoImage
+                self.icon_photo_16 = ImageTk.PhotoImage(icon_16)
+                self.icon_photo_32 = ImageTk.PhotoImage(icon_32)
+                self.icon_photo_48 = ImageTk.PhotoImage(icon_48)
+                
+                # Set icon
+                self.root.iconphoto(True, self.icon_photo_48, self.icon_photo_32, self.icon_photo_16)
+                icon_set = True
+                
+            except Exception as e:
+                pass
+        
+        # Method 3: Force update after window is shown
+        if icon_set:
+            self.root.after(100, self._force_icon_update)
+    
+    def _setup_windows_taskbar(self):
+        """Setup Windows-specific taskbar integration"""
+        try:
+            import sys
+            if sys.platform.startswith('win'):
+                # Try to set app ID for Windows 7+ taskbar grouping
+                try:
+                    import ctypes
+                    myappid = 'shadowhawk.database.browser.3.0'
+                    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+                except:
+                    pass
+                
+                # Try additional Windows icon setting
+                self.root.after(500, self._windows_icon_fix)
+        except:
+            pass
+    
+    def _force_icon_update(self):
+        """Force icon update after window is visible"""
+        try:
+            # Re-apply ICO icon if available
+            if os.path.exists("icon.ico"):
+                self.root.iconbitmap("icon.ico")
+            
+            # Update window to force refresh
+            self.root.update_idletasks()
+        except:
+            pass
+    
+    def _windows_icon_fix(self):
+        """Windows-specific icon fix for taskbar"""
+        try:
+            import sys
+            if sys.platform.startswith('win'):
+                # Try to refresh the window icon
+                if os.path.exists("icon.ico"):
+                    # Clear and reset icon
+                    self.root.iconbitmap("")
+                    self.root.iconbitmap("icon.ico")
+                    
+                # Force window refresh
+                self.root.lift()
+                self.root.attributes('-topmost', True)
+                self.root.after(100, lambda: self.root.attributes('-topmost', False))
+        except:
+            pass
+    
+    def _cleanup_temp_icon(self, icon_path: str):
+        """Clean up temporary ICO file"""
+        try:
+            import os
+            if os.path.exists(icon_path):
+                os.remove(icon_path)
+        except Exception:
+            pass  # Ignore cleanup errors
     
     def on_closing(self):
         """Handle application closing - save state before exit"""

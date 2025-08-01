@@ -65,6 +65,13 @@ if errorlevel 1 (
 )
 
 echo Starting ShadowHawk Database Browser...
+
+REM Create ICO icon if it doesn't exist (for better taskbar integration)
+if not exist "icon.ico" (
+    echo Creating ICO icon for better Windows taskbar integration...
+    %PYTHON_CMD% create_icon.py >nul 2>&1
+)
+
 echo.
 %PYTHON_CMD% main.py
 

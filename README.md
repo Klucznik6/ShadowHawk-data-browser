@@ -1,4 +1,8 @@
-# 🦅 ShadowHawk Database Browser v3.0
+# ShadowHawk Database Browser v3.0
+
+<div align="center">
+  <img src="assets/icon.png" alt="ShadowHawk Database Browser Icon" width="128" height="128">
+</div>
 
 A powerful, modern database browser and data analysis tool built with Python. Features ultra-fast Polars integration, CustomTkinter modern UI, and comprehensive database management capabilities.
 
