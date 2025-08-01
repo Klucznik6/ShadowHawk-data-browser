@@ -47,31 +47,75 @@ class PolarsDatabaseManager:
         """Ultra-fast CSV loading with Polars - up to 10x faster than pandas"""
         start_time = time.time()
         
-        # Get file info
+        # Get file info and validate
         file_size = os.path.getsize(filename)
         table_name = os.path.splitext(os.path.basename(filename))[0]
         table_name = table_name.replace(' ', '_').replace('-', '_')
+        
+        # Check if file is empty
+        if file_size == 0:
+            raise ValueError(f"CSV file is empty: {filename}")
+        
+        if file_size < 10:
+            raise ValueError(f"CSV file is too small (only {file_size} bytes): {filename}")
         
         if progress_callback:
             progress_callback(f"🚀 Starting Polars ultra-fast CSV load...", 10)
         
         try:
-            # Polars lazy loading for maximum efficiency
-            df_lazy = pl.scan_csv(
-                filename,
-                infer_schema_length=10000,  # Better type inference
-                null_values=["", "NULL", "null", "None", "N/A", "n/a"],
-                try_parse_dates=True
-            )
+            # Try multiple CSV parsing strategies
+            parsing_strategies = [
+                # Standard comma-separated with header
+                {"separator": ",", "has_header": True},
+                # Semicolon-separated (common in Europe)
+                {"separator": ";", "has_header": True},
+                # Tab-separated
+                {"separator": "\t", "has_header": True},
+                # Pipe-separated
+                {"separator": "|", "has_header": True},
+                # Comma-separated without header
+                {"separator": ",", "has_header": False},
+            ]
+            
+            df_polars = None
+            successful_strategy = None
+            
+            for i, strategy in enumerate(parsing_strategies):
+                try:
+                    if progress_callback:
+                        progress_callback(f"🔍 Trying parsing strategy {i+1}/{len(parsing_strategies)}...", 10 + (i * 5))
+                    
+                    # Use scan_csv for lazy loading
+                    df_lazy = pl.scan_csv(
+                        filename,
+                        separator=strategy["separator"],
+                        has_header=strategy["has_header"],
+                        infer_schema_length=10000,
+                        null_values=["", "NULL", "null", "None", "N/A", "n/a", "#N/A"],
+                        try_parse_dates=True,
+                        ignore_errors=True
+                    )
+                    
+                    # Try to collect a small sample first
+                    sample_df = df_lazy.head(5).collect()
+                    
+                    if len(sample_df.columns) > 0 and len(sample_df) > 0:
+                        # Success! Now collect the full dataset
+                        df_polars = df_lazy.collect()
+                        successful_strategy = strategy
+                        break
+                        
+                except Exception as strategy_error:
+                    if progress_callback:
+                        progress_callback(f"⚠️ Strategy {i+1} failed: {str(strategy_error)[:50]}...", 10 + (i * 5))
+                    continue
+            
+            if df_polars is None or len(df_polars.columns) == 0:
+                raise ValueError("Could not parse CSV file with any strategy. The file may be corrupted or have an unsupported format.")
             
             if progress_callback:
-                progress_callback(f"📊 Schema inferred, collecting data...", 30)
-            
-            # Collect to Polars DataFrame (still much faster than pandas)
-            df_polars = df_lazy.collect()
-            
-            if progress_callback:
-                progress_callback(f"✨ Polars loaded {len(df_polars):,} rows", 60)
+                strategy_desc = f"separator='{successful_strategy['separator']}', header={successful_strategy['has_header']}"
+                progress_callback(f"✨ Polars loaded {len(df_polars):,} rows with {strategy_desc}", 60)
             
             # Cache the Polars DataFrame for ultra-fast search
             if filename not in self.polars_cache:
@@ -469,3 +513,134 @@ class PolarsDatabaseManager:
             'max_workers': self.max_workers,
             'chunk_size': self.chunk_size
         }
+    
+    def load_sqlite_polars(self, filename: str, progress_callback: Callable = None) -> Tuple[sqlite3.Connection, List[str]]:
+        """Load SQLite database and return connection with table list"""
+        if progress_callback:
+            progress_callback(f"🗂️ Opening SQLite database: {os.path.basename(filename)}", 20)
+        
+        try:
+            # Create connection to the SQLite file
+            conn = sqlite3.connect(filename, check_same_thread=False)
+            
+            if progress_callback:
+                progress_callback(f"📊 Reading database schema...", 40)
+            
+            # Get list of tables
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = [row[0] for row in cursor.fetchall()]
+            
+            if not tables:
+                raise ValueError("No tables found in SQLite database")
+            
+            if progress_callback:
+                progress_callback(f"✅ Found {len(tables)} tables: {', '.join(tables)}", 100)
+            
+            return conn, tables
+            
+        except Exception as e:
+            raise ValueError(f"Failed to load SQLite database: {str(e)}")
+    
+    def load_access_polars(self, filename: str, progress_callback: Callable = None) -> Tuple[sqlite3.Connection, List[str]]:
+        """Load MS Access database and convert to SQLite connection"""
+        if not PYODBC_AVAILABLE:
+            raise ValueError("pyodbc is required for Access database support")
+        
+        if progress_callback:
+            progress_callback(f"🗂️ Opening Access database: {os.path.basename(filename)}", 10)
+        
+        try:
+            # Create connection string for Access database
+            conn_str = f"DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={filename};"
+            access_conn = pyodbc.connect(conn_str)
+            
+            if progress_callback:
+                progress_callback(f"📊 Reading Access schema...", 30)
+            
+            # Get list of tables
+            cursor = access_conn.cursor()
+            tables = [row.table_name for row in cursor.tables(tableType='TABLE')]
+            
+            if not tables:
+                raise ValueError("No tables found in Access database")
+            
+            # Create SQLite in-memory database
+            sqlite_conn = sqlite3.connect(':memory:', check_same_thread=False)
+            
+            if progress_callback:
+                progress_callback(f"🔄 Converting {len(tables)} tables to SQLite...", 50)
+            
+            # Copy each table from Access to SQLite
+            for i, table_name in enumerate(tables):
+                # Read table from Access using pandas
+                df = pd.read_sql(f"SELECT * FROM [{table_name}]", access_conn)
+                
+                # Write to SQLite
+                df.to_sql(table_name, sqlite_conn, if_exists='replace', index=False)
+                
+                if progress_callback:
+                    progress = 50 + (i * 40) // len(tables)
+                    progress_callback(f"🔄 Converted table: {table_name}", progress)
+            
+            access_conn.close()
+            
+            if progress_callback:
+                progress_callback(f"✅ Access database converted: {len(tables)} tables", 100)
+            
+            return sqlite_conn, tables
+            
+        except Exception as e:
+            raise ValueError(f"Failed to load Access database: {str(e)}")
+    
+    def load_json_polars(self, filename: str, progress_callback: Callable = None) -> Tuple[sqlite3.Connection, str]:
+        """Load JSON file and convert to SQLite table"""
+        table_name = os.path.splitext(os.path.basename(filename))[0]
+        table_name = table_name.replace(' ', '_').replace('-', '_')
+        
+        if progress_callback:
+            progress_callback(f"📄 Loading JSON file: {os.path.basename(filename)}", 20)
+        
+        try:
+            # Try loading with Polars first (faster)
+            df_polars = pl.read_json(filename)
+            
+            if progress_callback:
+                progress_callback(f"✨ Polars loaded {len(df_polars):,} records", 60)
+            
+            # Convert to pandas for SQLite compatibility
+            df_pandas = df_polars.to_pandas()
+            
+            if progress_callback:
+                progress_callback(f"🔄 Converting to database format...", 80)
+            
+            # Create SQLite connection
+            conn = sqlite3.connect(':memory:', check_same_thread=False)
+            df_pandas.to_sql(table_name, conn, if_exists='replace', index=False)
+            
+            if progress_callback:
+                progress_callback(f"✅ JSON loaded as table: {table_name}", 100)
+            
+            return conn, table_name
+            
+        except Exception as e:
+            # Fallback to pandas
+            if progress_callback:
+                progress_callback(f"⚠️ Polars failed, using pandas fallback...", 40)
+            
+            try:
+                df_pandas = pd.read_json(filename)
+                
+                if progress_callback:
+                    progress_callback(f"📦 Pandas loaded {len(df_pandas):,} records", 80)
+                
+                conn = sqlite3.connect(':memory:', check_same_thread=False)
+                df_pandas.to_sql(table_name, conn, if_exists='replace', index=False)
+                
+                if progress_callback:
+                    progress_callback(f"✅ JSON loaded as table: {table_name}", 100)
+                
+                return conn, table_name
+                
+            except Exception as fallback_error:
+                raise ValueError(f"Failed to load JSON file: {str(fallback_error)}")

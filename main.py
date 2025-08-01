@@ -542,11 +542,46 @@ class ShadowHawkBrowser:
 
                 db_info = self.databases[self.current_db]
                 filename = db_info['path']
-                # Get DataFrame from Polars cache
+                connection = db_info['connection']
+                db_type = db_info.get('type', 'sqlite')
+                
+                # Try to get data from Polars cache first (for CSV, Excel, JSON files)
                 df_polars = self.polars_manager.polars_cache.get(filename, {}).get(table_name)
-                if df_polars is None:
-                    raise ValueError(f"No data found for table '{table_name}' in file '{filename}'")
-                df = df_polars.to_pandas()
+                
+                if df_polars is not None:
+                    # Use cached Polars DataFrame (faster for CSV/Excel/JSON)
+                    df = df_polars.to_pandas()
+                else:
+                    # Query from database directly (for SQLite, Access, or uncached data)
+                    try:
+                        query = f"SELECT * FROM [{table_name}]"
+                        df = pd.read_sql_query(query, connection)
+                    except Exception as sql_error:
+                        # Try without brackets in case of naming issues
+                        query = f"SELECT * FROM {table_name}"
+                        df = pd.read_sql_query(query, connection)
+                
+                if df is None or len(df) == 0:
+                    # Check if table exists but is empty
+                    try:
+                        count_query = f"SELECT COUNT(*) FROM [{table_name}]"
+                        cursor = connection.cursor()
+                        cursor.execute(count_query)
+                        row_count = cursor.fetchone()[0]
+                        if row_count == 0:
+                            # Table exists but is empty
+                            df = pd.DataFrame()  # Create empty DataFrame with no columns yet
+                            # Get column names
+                            cursor.execute(f"PRAGMA table_info([{table_name}])")
+                            columns_info = cursor.fetchall()
+                            if columns_info:
+                                column_names = [col[1] for col in columns_info]
+                                df = pd.DataFrame(columns=column_names)
+                        else:
+                            raise ValueError(f"Table '{table_name}' appears to have {row_count} rows but no data could be retrieved")
+                    except Exception as e:
+                        raise ValueError(f"No data found for table '{table_name}' in file '{filename}': {str(e)}")
+                
                 table_info = {
                     'row_count': len(df),
                     'columns': list(df.columns)
