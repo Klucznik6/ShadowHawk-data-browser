@@ -1,7 +1,7 @@
 @echo off
 echo.
 echo ==========================================
-echo  ShadowHawk Database Browser v3.0
+echo  ShadowHawk Database Browser v1.0.0
 echo  Starting Application...
 echo ==========================================
 echo.

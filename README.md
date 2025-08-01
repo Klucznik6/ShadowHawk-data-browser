@@ -1,4 +1,4 @@
-# ShadowHawk Database Browser v3.0
+# ShadowHawk Database Browser v1.0.0
 
 <div align="center">
   <img src="assets/icon.png" alt="ShadowHawk Database Browser Icon" width="128" height="128">
@@ -9,7 +9,7 @@ A powerful, modern database browser and data analysis tool built with Python. Fe
 ![Python](https://img.shields.io/badge/Python-3.13%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
-![Version](https://img.shields.io/badge/Version-3.0-brightgreen)
+![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen)
 
 ## ✨ Key Features
 
@@ -267,9 +267,9 @@ black *.py
 
 ## 📈 Version History
 
-- **v3.0** - Modern CustomTkinter UI, database persistence, global search
-- **v2.0** - Polars integration, enhanced performance, multi-format support  
-- **v1.0** - Initial release with basic database browsing
+- **v1.0.0** - Modern CustomTkinter UI, database persistence, global search, custom icons
+- **v0.2.0** - Polars integration, enhanced performance, multi-format support  
+- **v0.1.0** - Initial release with basic database browsing
 
 ## 📄 License
 

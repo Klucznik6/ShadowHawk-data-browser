@@ -28,7 +28,7 @@ class ShadowHawkBrowser:
         else:
             self.root = tk.Tk()
             
-        self.root.title("ShadowHawk Database Browser v2.0")
+        self.root.title("ShadowHawk Database Browser v1.0.0")
         self.root.geometry("1400x900")
         self.root.minsize(1000, 700)
         
@@ -1421,7 +1421,7 @@ View:
     def show_about(self):
         """Show about dialog"""
         about_text = """
-ShadowHawk Database Browser v2.0
+ShadowHawk Database Browser v1.0.0
 
 A fast and modern desktop application for browsing local databases and data files.
 
@@ -1830,7 +1830,7 @@ Built with Python, tkinter, and pandas.
                 # Try to set app ID for Windows 7+ taskbar grouping
                 try:
                     import ctypes
-                    myappid = 'shadowhawk.database.browser.3.0'
+                    myappid = 'shadowhawk.database.browser.1.0.0'
                     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
                 except:
                     pass
