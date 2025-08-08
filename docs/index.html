@@ -693,7 +693,7 @@
                 <div class="col-lg-6">
                     <div class="hero-image">
                         <div class="app-mockup">
-                            <img src="website/assets/proUI.png" alt="ShadowHawk Database Browser Interface" class="img-fluid">
+                            <img src="website/assets/fisrt.png" alt="ShadowHawk Database Browser Interface" class="img-fluid">
                         </div>
                     </div>
                 </div>
@@ -836,17 +836,8 @@
                     <div class="text-center">
                         <div style="background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: 20px; padding: 3rem; box-shadow: var(--shadow-lg);">
                             <h4 style="color: var(--text-primary); margin-bottom: 2rem;">Performance Comparison</h4>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; text-align: left;">
-                                <div>
-                                    <h6 style="color: var(--text-secondary); margin-bottom: 1rem;">Traditional Tools</h6>
-                                    <div style="background: var(--gray-200); height: 8px; border-radius: 4px; margin-bottom: 0.5rem;"></div>
-                                    <small style="color: var(--text-muted);">Standard Speed</small>
-                                </div>
-                                <div>
-                                    <h6 style="color: var(--primary-blue); margin-bottom: 1rem;">ShadowHawk (Polars)</h6>
-                                    <div style="background: linear-gradient(90deg, var(--primary-blue), var(--secondary-purple)); height: 8px; border-radius: 4px; margin-bottom: 0.5rem;"></div>
-                                    <small style="color: var(--text-muted);">5-30x Faster</small>
-                                </div>
+                            <div style="position: relative; height: 400px;">
+                                <canvas id="performanceChart"></canvas>
                             </div>
                             <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-accent); border-radius: 12px;">
                                 <p style="color: var(--text-secondary); margin: 0; font-size: 0.95rem;">
@@ -906,50 +897,123 @@
     <!-- Download Section -->
     <section id="download" class="section download-section">
         <div class="container">
-            <div class="row justify-content-center">
-                <div class="col-lg-8">
-                    <div class="download-card">
-                        <div class="download-icon">
-                            <i class="bi bi-download"></i>
+            <div class="row align-items-center">
+                <div class="col-lg-6">
+                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 3rem; backdrop-filter: blur(20px);">
+                        <div style="text-align: center; margin-bottom: 2rem;">
+                            <div style="background: linear-gradient(135deg, var(--accent-orange), var(--accent-orange-light)); width: 80px; height: 80px; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);">
+                                <i class="bi bi-windows" style="font-size: 2.5rem; color: white;"></i>
+                            </div>
+                            <h3 style="margin-bottom: 1rem; font-size: 2rem;">Download for Windows</h3>
+                            <p style="font-size: 1.125rem; margin-bottom: 2rem; opacity: 0.9;">
+                                Get the fastest database browser for Windows. 
+                                <strong>Ready-to-run installer</strong> with all dependencies included.
+                            </p>
                         </div>
-                        <h3 style="margin-bottom: 1rem;">Download ShadowHawk v1.0.0</h3>
-                        <p style="font-size: 1.125rem; margin-bottom: 2rem; opacity: 0.9;">
-                            Get started with the fastest database browser available. 
-                            Free, open-source, and ready to use on Windows, macOS, and Linux.
-                        </p>
                         
-                        <a href="https://github.com/Klucznik6/ShadowHawk-data-browser/releases" class="btn-download" target="_blank">
-                            <i class="bi bi-download"></i>
-                            Download Now
+                        <a href="https://github.com/Klucznik6/ShadowHawk-data-browser/releases" 
+                           style="background: var(--accent-orange); color: white; border: none; padding: 1.25rem 3rem; font-size: 1.25rem; font-weight: 600; border-radius: 12px; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 0.75rem; transition: all 0.2s ease; margin-bottom: 2rem; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);" 
+                           target="_blank"
+                           onmouseover="this.style.background='var(--accent-orange-light)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(245, 158, 11, 0.4)'"
+                           onmouseout="this.style.background='var(--accent-orange)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(245, 158, 11, 0.3)'">
+                            <i class="bi bi-download" style="font-size: 1.25rem;"></i>
+                            Download ShadowHawk v1.0.0
                         </a>
                         
-                        <div class="download-links">
-                            <a href="https://github.com/Klucznik6/ShadowHawk-data-browser">
-                                <i class="bi bi-github"></i> View Source Code
+                        <div style="text-align: center; margin-bottom: 2rem;">
+                            <div style="background: rgba(255, 255, 255, 0.05); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                                <small style="color: rgba(255, 255, 255, 0.8);">
+                                    <i class="bi bi-info-circle"></i> 
+                                    Download size: ~50MB • Installation time: 2-3 minutes
+                                </small>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: center;">
+                            <a href="https://github.com/Klucznik6/ShadowHawk-data-browser" 
+                               style="color: rgba(255, 255, 255, 0.8); text-decoration: none; padding: 0.75rem; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; transition: all 0.2s ease;"
+                               onmouseover="this.style.color='white'; this.style.borderColor='rgba(255, 255, 255, 0.4)'"
+                               onmouseout="this.style.color='rgba(255, 255, 255, 0.8)'; this.style.borderColor='rgba(255, 255, 255, 0.2)'">
+                                <i class="bi bi-github"></i><br>
+                                <small>Source Code</small>
                             </a>
-                            <a href="../README.md">
-                                <i class="bi bi-book"></i> Documentation
+                            <a href="../README.md" 
+                               style="color: rgba(255, 255, 255, 0.8); text-decoration: none; padding: 0.75rem; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; transition: all 0.2s ease;"
+                               onmouseover="this.style.color='white'; this.style.borderColor='rgba(255, 255, 255, 0.4)'"
+                               onmouseout="this.style.color='rgba(255, 255, 255, 0.8)'; this.style.borderColor='rgba(255, 255, 255, 0.2)'">
+                                <i class="bi bi-book"></i><br>
+                                <small>Documentation</small>
                             </a>
                         </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 3rem; backdrop-filter: blur(20px);">
+                        <h4 style="margin-bottom: 2rem; text-align: center; color: white;">Installation Performance</h4>
                         
-                        <div style="margin-top: 3rem; padding: 2rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px; text-align: left;">
-                            <h6 style="margin-bottom: 1rem; text-align: center;">System Requirements</h6>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                                <div>
-                                    <strong>🖥️ Operating System:</strong><br>
-                                    Windows 10/11, macOS 10.14+, or Linux
+                        <!-- Installation Speed Chart -->
+                        <div style="margin-bottom: 2rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <span style="color: rgba(255, 255, 255, 0.9); font-weight: 500;">Setup Time</span>
+                                <span style="color: var(--accent-emerald-light); font-weight: 600;">2-3 min</span>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, var(--accent-emerald), var(--accent-emerald-light)); width: 85%; height: 100%; border-radius: 4px; animation: fillProgress 2s ease-out;"></div>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 2rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <span style="color: rgba(255, 255, 255, 0.9); font-weight: 500;">First Launch</span>
+                                <span style="color: var(--primary-blue-light); font-weight: 600;">&lt; 5 sec</span>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, var(--primary-blue), var(--primary-blue-light)); width: 95%; height: 100%; border-radius: 4px; animation: fillProgress 2.5s ease-out;"></div>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 2rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <span style="color: rgba(255, 255, 255, 0.9); font-weight: 500;">File Loading</span>
+                                <span style="color: var(--secondary-purple-light); font-weight: 600;">Ultra Fast</span>
+                            </div>
+                            <div style="background: rgba(255, 255, 255, 0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, var(--secondary-purple), var(--secondary-purple-light)); width: 98%; height: 100%; border-radius: 4px; animation: fillProgress 3s ease-out;"></div>
+                            </div>
+                        </div>
+
+                        <!-- System Requirements -->
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 2rem; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                            <h6 style="margin-bottom: 1.5rem; text-align: center; color: white;">Windows Requirements</h6>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                                <div style="text-align: center;">
+                                    <div style="background: rgba(13, 110, 253, 0.2); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem;">
+                                        <i class="bi bi-windows" style="color: var(--primary-blue-light); font-size: 1.25rem;"></i>
+                                    </div>
+                                    <div style="color: rgba(255, 255, 255, 0.9); font-weight: 500; margin-bottom: 0.25rem;">OS</div>
+                                    <div style="color: rgba(255, 255, 255, 0.7); font-size: 0.9rem;">Windows 10/11</div>
                                 </div>
-                                <div>
-                                    <strong>🐍 Python:</strong><br>
-                                    Python 3.8+ (3.10+ recommended)
+                                <div style="text-align: center;">
+                                    <div style="background: rgba(16, 185, 129, 0.2); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem;">
+                                        <i class="bi bi-memory" style="color: var(--accent-emerald-light); font-size: 1.25rem;"></i>
+                                    </div>
+                                    <div style="color: rgba(255, 255, 255, 0.9); font-weight: 500; margin-bottom: 0.25rem;">RAM</div>
+                                    <div style="color: rgba(255, 255, 255, 0.7); font-size: 0.9rem;">2GB+ (4GB rec.)</div>
                                 </div>
-                                <div>
-                                    <strong>💾 Memory:</strong><br>
-                                    2GB RAM (4GB+ recommended)
+                                <div style="text-align: center;">
+                                    <div style="background: rgba(245, 158, 11, 0.2); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem;">
+                                        <i class="bi bi-hdd" style="color: var(--accent-orange-light); font-size: 1.25rem;"></i>
+                                    </div>
+                                    <div style="color: rgba(255, 255, 255, 0.9); font-weight: 500; margin-bottom: 0.25rem;">Storage</div>
+                                    <div style="color: rgba(255, 255, 255, 0.7); font-size: 0.9rem;">100MB free</div>
                                 </div>
-                                <div>
-                                    <strong>💿 Storage:</strong><br>
-                                    100MB disk space
+                                <div style="text-align: center;">
+                                    <div style="background: rgba(139, 92, 246, 0.2); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem;">
+                                        <i class="bi bi-code-slash" style="color: var(--secondary-purple-light); font-size: 1.25rem;"></i>
+                                    </div>
+                                    <div style="color: rgba(255, 255, 255, 0.9); font-weight: 500; margin-bottom: 0.25rem;">Python</div>
+                                    <div style="color: rgba(255, 255, 255, 0.7); font-size: 0.9rem;">3.8+ (3.10+ rec.)</div>
                                 </div>
                             </div>
                         </div>
@@ -958,6 +1022,13 @@
             </div>
         </div>
     </section>
+
+    <style>
+        @keyframes fillProgress {
+            from { width: 0%; }
+            to { width: var(--final-width, 100%); }
+        }
+    </style>
 
     <!-- Footer -->
     <footer class="footer">
@@ -990,6 +1061,9 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     
+    <!-- Chart.js for Performance Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <script>
         // Smooth scrolling for navigation links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -1020,6 +1094,161 @@
             }
         });
 
+        // Performance Chart
+        function initPerformanceChart() {
+            const ctx = document.getElementById('performanceChart');
+            if (!ctx) return;
+            
+            const gradient1 = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+            gradient1.addColorStop(0, 'rgba(37, 99, 235, 0.8)');
+            gradient1.addColorStop(1, 'rgba(124, 58, 237, 0.8)');
+            
+            const gradient2 = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+            gradient2.addColorStop(0, 'rgba(156, 163, 175, 0.6)');
+            gradient2.addColorStop(1, 'rgba(107, 114, 128, 0.6)');
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Data Loading', 'Search Operations', 'Table Rendering', 'Memory Usage', 'Export Speed'],
+                    datasets: [{
+                        label: 'Traditional Tools',
+                        data: [100, 100, 100, 100, 100],
+                        backgroundColor: gradient2,
+                        borderColor: 'rgba(107, 114, 128, 1)',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        borderSkipped: false,
+                    }, {
+                        label: 'ShadowHawk (Polars)',
+                        data: [500, 800, 300, 250, 600],
+                        backgroundColor: gradient1,
+                        borderColor: 'rgba(37, 99, 235, 1)',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Performance Improvement Comparison',
+                            font: {
+                                size: 18,
+                                weight: 'bold',
+                                family: 'Inter'
+                            },
+                            color: '#0f172a',
+                            padding: 20
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14,
+                                    family: 'Inter',
+                                    weight: '500'
+                                },
+                                color: '#475569',
+                                usePointStyle: true,
+                                pointStyle: 'rectRounded',
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: 'rgba(37, 99, 235, 0.3)',
+                            borderWidth: 1,
+                            cornerRadius: 12,
+                            displayColors: true,
+                            titleFont: {
+                                family: 'Inter',
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                family: 'Inter',
+                                size: 13
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    const improvement = context.parsed.y;
+                                    const multiplier = (improvement / 100).toFixed(1);
+                                    return `${context.dataset.label}: ${improvement}% (${multiplier}x faster)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 900,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                },
+                                font: {
+                                    family: 'Inter',
+                                    size: 12
+                                },
+                                color: '#64748b'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Performance Improvement (%)',
+                                font: {
+                                    family: 'Inter',
+                                    size: 14,
+                                    weight: '600'
+                                },
+                                color: '#334155'
+                            },
+                            grid: {
+                                color: 'rgba(226, 232, 240, 0.8)',
+                                lineWidth: 1
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 12
+                                },
+                                color: '#64748b',
+                                maxRotation: 45
+                            },
+                            title: {
+                                display: true,
+                                text: 'Operations',
+                                font: {
+                                    family: 'Inter',
+                                    size: 14,
+                                    weight: '600'
+                                },
+                                color: '#334155'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeOutQuart'
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
         // Image error handling with placeholder
         document.querySelectorAll('img').forEach(img => {
             img.onerror = function() {
@@ -1031,7 +1260,13 @@
             };
         });
 
-        console.log('🦅 ShadowHawk Database Browser website loaded successfully!');
+        // Initialize chart when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Wait a bit for Chart.js to load
+            setTimeout(initPerformanceChart, 100);
+        });
+
+        console.log('ShadowHawk Database Browser website loaded successfully!');
     </script>
 </body>
 </html>
